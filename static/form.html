@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asquared Real Estate - Register Your Interest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4 bg-slate-950">
+    <div class="w-full max-w-md glass-panel p-8 rounded-2xl shadow-2xl space-y-6">
+        <div class="text-center">
+            <h1 class="text-2xl font-bold tracking-wider text-blue-400">Asquared Real Estate</h1>
+            <p class="text-gray-400 text-sm mt-1">Register your interest for premium Dubai properties</p>
+        </div>
+
+        <form id="public-lead-form" class="space-y-4" onsubmit="submitPublicForm(event)">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Full Name</label>
+                <input type="text" id="form-name" required placeholder="John Doe" class="w-full bg-slate-900 border border-gray-700 rounded-lg p-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Phone Number (with Country Code)</label>
+                <input type="tel" id="form-phone" required placeholder="+971501234567" class="w-full bg-slate-900 border border-gray-700 rounded-lg p-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Email Address</label>
+                <input type="email" id="form-email" placeholder="john@example.com" class="w-full bg-slate-900 border border-gray-700 rounded-lg p-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Lead Source</label>
+                <select id="form-source" class="w-full bg-slate-900 border border-gray-700 rounded-lg p-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
+                    <option value="Property Finder WhatsApp">Property Finder WhatsApp</option>
+                    <option value="Property Finder Call">Property Finder Call</option>
+                    <option value="Instagram Ad">Instagram Ad</option>
+                    <option value="Facebook Ad">Facebook Ad</option>
+                    <option value="Website Form">Website Form</option>
+                </select>
+            </div>
+            <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold transition duration-200 text-white shadow-lg shadow-blue-600/30">Register Now</button>
+        </form>
+
+        <div id="form-message" class="hidden text-center p-4 rounded-lg text-sm"></div>
+    </div>
+
+    <script>
+        async function submitPublicForm(e) {
+            e.preventDefault();
+            const msgDiv = document.getElementById('form-message');
+            const form = document.getElementById('public-lead-form');
+            
+            msgDiv.classList.remove('hidden', 'bg-green-500/20', 'text-green-400', 'bg-red-500/20', 'text-red-400');
+            msgDiv.classList.add('bg-slate-800', 'text-gray-300');
+            msgDiv.innerText = "Submitting your request...";
+            msgDiv.classList.remove('hidden');
+
+            const payload = {
+                name: document.getElementById('form-name').value,
+                phone: document.getElementById('form-phone').value,
+                email: document.getElementById('form-email').value || null,
+                source: document.getElementById('form-source').value
+            };
+
+            try {
+                const res = await fetch('/api/leads/form', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    msgDiv.className = "p-4 rounded-lg text-sm bg-green-500/20 text-green-400 text-center";
+                    msgDiv.innerText = "Thank you! An agent will contact you shortly.";
+                    form.reset();
+                } else {
+                    msgDiv.className = "p-4 rounded-lg text-sm bg-red-500/20 text-red-400 text-center";
+                    msgDiv.innerText = `Error: ${data.message}`;
+                }
+            } catch (err) {
+                msgDiv.className = "p-4 rounded-lg text-sm bg-red-500/20 text-red-400 text-center";
+                msgDiv.innerText = `Network error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

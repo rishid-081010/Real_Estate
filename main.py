@@ -238,3 +238,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def serve_dashboard():
     return FileResponse("static/index.html")
+
+@app.get("/form")
+def serve_form():
+    return FileResponse("static/form.html")
