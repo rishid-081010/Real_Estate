@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import csv
 import io
+from typing import Optional
 from fastapi import FastAPI, Depends, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
