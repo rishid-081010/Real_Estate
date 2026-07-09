@@ -22,19 +22,19 @@
             <h1 class="text-xl font-bold tracking-wider text-blue-400">Asquared AI</h1>
         </div>
         <nav class="flex-1 p-4 space-y-2">
-            <a href="#" class="block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500">Dashboard</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Outbound</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Conversation Logs</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calendar Bookings</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Analytics</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calls</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Integrations</a>
-            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Settings</a>
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500">Dashboard</button>
+            <button onclick="switchTab('outbound')" id="nav-outbound" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Outbound</button>
+            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Conversation Logs</button>
+            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calendar Bookings</button>
+            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Analytics</button>
+            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calls</button>
+            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Integrations</button>
+            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Settings</button>
         </nav>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6">
+    <!-- Main Content Panel (Dashboard) -->
+    <main id="panel-dashboard" class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6">
         <header class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-semibold">Overview</h2>
             <div class="flex items-center space-x-4">
@@ -63,7 +63,7 @@
             </div>
         </div>
 
-        <!-- Pipeline (Based on Client's CRM Screenshot) -->
+        <!-- Pipeline -->
         <div class="glass-panel p-6 rounded-xl shadow-lg">
             <h3 class="text-lg font-medium mb-4 border-b border-gray-700 pb-2">Lead Pipeline Stages</h3>
             <div class="flex justify-between items-center text-center">
@@ -130,8 +130,147 @@
         </div>
     </main>
 
+    <!-- Main Content Panel (Outbound Triggers) -->
+    <main id="panel-outbound" class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6 hidden">
+        <header class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold">Lead Intake & Outbound Simulation</h2>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Form Ingestion -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-lg font-medium mb-4 border-b border-gray-700 pb-2">Single Lead Form (Instagram/FB Mock)</h3>
+                <form id="lead-form" class="space-y-4" onsubmit="submitForm(event)">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Full Name</label>
+                        <input type="text" id="form-name" required class="w-full bg-slate-800 border border-gray-700 rounded p-2 text-slate-100 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Phone Number (E.164, e.g. +971501234567)</label>
+                        <input type="text" id="form-phone" required class="w-full bg-slate-800 border border-gray-700 rounded p-2 text-slate-100 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Email</label>
+                        <input type="email" id="form-email" class="w-full bg-slate-800 border border-gray-700 rounded p-2 text-slate-100 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Source</label>
+                        <select id="form-source" class="w-full bg-slate-800 border border-gray-700 rounded p-2 text-slate-100 focus:outline-none focus:border-blue-500">
+                            <option value="instagram">Instagram Ad</option>
+                            <option value="facebook">Facebook Ad</option>
+                            <option value="website">Website Form</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded font-semibold transition">Submit Lead</button>
+                </form>
+                <div id="form-message" class="mt-2 text-sm"></div>
+            </div>
+
+            <!-- Batch CSV Upload -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-lg font-medium mb-4 border-b border-gray-700 pb-2">Batch Lead Import (CSV)</h3>
+                <div class="space-y-4">
+                    <p class="text-sm text-gray-400">Upload a CSV file containing leads. Columns must include: <code class="text-blue-300">name</code>, <code class="text-blue-300">phone</code>, <code class="text-blue-300">email</code>, <code class="text-blue-300">source</code>.</p>
+                    <input type="file" id="csv-file" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-800 file:text-blue-400 hover:file:bg-gray-700 file:cursor-pointer">
+                    <button onclick="uploadCSV()" class="w-full py-2 bg-green-600 hover:bg-green-500 rounded font-semibold transition">Process CSV</button>
+                    <div id="csv-message" class="mt-2 text-sm"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
     <script>
         let chartInstance = null;
+
+        function switchTab(tab) {
+            const dashPanel = document.getElementById('panel-dashboard');
+            const outboundPanel = document.getElementById('panel-outbound');
+            const navDash = document.getElementById('nav-dashboard');
+            const navOut = document.getElementById('nav-outbound');
+
+            if (tab === 'dashboard') {
+                dashPanel.classList.remove('hidden');
+                outboundPanel.classList.add('hidden');
+                navDash.className = "w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500";
+                navOut.className = "w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition";
+                fetchData();
+            } else {
+                dashPanel.classList.add('hidden');
+                outboundPanel.classList.remove('hidden');
+                navDash.className = "w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition";
+                navOut.className = "w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500";
+            }
+        }
+
+        async function submitForm(e) {
+            e.preventDefault();
+            const msgDiv = document.getElementById('form-message');
+            msgDiv.className = "mt-2 text-sm text-gray-400";
+            msgDiv.innerText = "Submitting...";
+
+            const payload = {
+                name: document.getElementById('form-name').value,
+                phone: document.getElementById('form-phone').value,
+                email: document.getElementById('form-email').value || null,
+                source: document.getElementById('form-source').value
+            };
+
+            try {
+                const res = await fetch('/api/leads/form', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    msgDiv.className = "mt-2 text-sm text-green-400";
+                    msgDiv.innerText = "Lead successfully created!";
+                    document.getElementById('lead-form').reset();
+                } else {
+                    msgDiv.className = "mt-2 text-sm text-red-400";
+                    msgDiv.innerText = `Error: ${data.message}`;
+                }
+            } catch (err) {
+                msgDiv.className = "mt-2 text-sm text-red-400";
+                msgDiv.innerText = `Network error: ${err.message}`;
+            }
+        }
+
+        async function uploadCSV() {
+            const msgDiv = document.getElementById('csv-message');
+            const fileInput = document.getElementById('csv-file');
+            
+            if (!fileInput.files.length) {
+                msgDiv.className = "mt-2 text-sm text-red-400";
+                msgDiv.innerText = "Please select a file first.";
+                return;
+            }
+
+            msgDiv.className = "mt-2 text-sm text-gray-400";
+            msgDiv.innerText = "Processing CSV...";
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/api/leads/batch', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    msgDiv.className = "mt-2 text-sm text-green-400";
+                    msgDiv.innerText = `Batch processed. Created: ${data.created}, Skipped (duplicate): ${data.skipped}`;
+                    fileInput.value = '';
+                } else {
+                    msgDiv.className = "mt-2 text-sm text-red-400";
+                    msgDiv.innerText = `Error processing file.`;
+                }
+            } catch (err) {
+                msgDiv.className = "mt-2 text-sm text-red-400";
+                msgDiv.innerText = `Network error: ${err.message}`;
+            }
+        }
 
         async function fetchData() {
             try {
@@ -164,7 +303,7 @@
                     else if(lead.status === 'handed_off') cHand++;
 
                     // Sources
-                    sources[lead.channel] = (sources[lead.channel] || 0) + 1;
+                    sources[lead.source || 'unknown'] = (sources[lead.source || 'unknown'] || 0) + 1;
 
                     // Log (Simulated reverse chron)
                     const logEntry = document.createElement('div');
@@ -173,15 +312,15 @@
                     
                     let actionText = '';
                     let dotColor = 'bg-blue-500';
-                    if (lead.status === 'new') actionText = `New lead received via ${lead.channel}`;
-                    else if (lead.status === 'engaging') { actionText = `AI is engaging lead`; dotColor = 'bg-yellow-500'; }
+                    if (lead.status === 'new') actionText = `New lead created via ${lead.channel} from source: ${lead.source}`;
+                    else if (lead.status === 'engaging') { actionText = `AI is engaging lead via ${lead.channel}`; dotColor = 'bg-yellow-500'; }
                     else if (lead.status === 'qualified') { actionText = `Lead qualified! Score: ${lead.score}`; dotColor = 'bg-green-500'; }
-                    else if (lead.status === 'handed_off') { actionText = `Handoff complete for meeting.`; dotColor = 'bg-purple-500'; }
+                    else if (lead.status === 'handed_off') { actionText = `Handoff complete. Meeting booked.`; dotColor = 'bg-purple-500'; }
 
                     logEntry.innerHTML = `
                         <div class="w-2 h-2 rounded-full ${dotColor}"></div>
                         <div class="text-xs text-gray-500 w-20">${timeStr}</div>
-                        <div><strong>${lead.phone}</strong>: ${actionText}</div>
+                        <div><strong>${lead.phone} (${lead.name || 'No Name'})</strong>: ${actionText}</div>
                     `;
                     logContainer.appendChild(logEntry);
 

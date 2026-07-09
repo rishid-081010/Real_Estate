@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+import csv
+import io
+from fastapi import FastAPI, Depends, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
@@ -17,6 +19,12 @@ app = FastAPI(title="Asquared Real Estate AI Sales Agent", lifespan=lifespan)
 class ChatRequest(BaseModel):
     phone: str
     message: str
+
+class LeadFormRequest(BaseModel):
+    name: str
+    phone: str
+    email: Optional[str] = None
+    source: Optional[str] = "form"
 
 class RetellWebhookRequest(BaseModel):
     call_id: str
@@ -157,6 +165,65 @@ def retell_webhook(req: RetellWebhookRequest, db: Session = Depends(get_session)
     db.commit()
 
     return {"status": "success", "message": "Data saved"}
+
+@app.post("/api/leads/form")
+def create_lead_form(req: LeadFormRequest, db: Session = Depends(get_session)):
+    # Standardize phone lookup
+    statement = select(Lead).where(Lead.phone == req.phone)
+    lead = db.exec(statement).first()
+    if lead:
+        return {"status": "error", "message": "Lead already exists"}
+    
+    lead = Lead(
+        name=req.name,
+        phone=req.phone,
+        email=req.email,
+        source=req.source,
+        channel="form",
+        status="new"
+    )
+    db.add(lead)
+    db.commit()
+    db.refresh(lead)
+    
+    # In later stages, this triggers Bitrix24 creation:
+    # create_bitrix_lead(lead)
+    
+    return {"status": "success", "lead_id": lead.id}
+
+@app.post("/api/leads/batch")
+async def create_leads_batch(file: UploadFile = File(...), db: Session = Depends(get_session)):
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    csv_reader = csv.DictReader(io.StringIO(decoded))
+    
+    created_count = 0
+    skipped_count = 0
+    
+    for row in csv_reader:
+        phone = row.get("phone")
+        if not phone:
+            continue
+            
+        statement = select(Lead).where(Lead.phone == phone)
+        lead = db.exec(statement).first()
+        if lead:
+            skipped_count += 1
+            continue
+            
+        lead = Lead(
+            name=row.get("name"),
+            phone=phone,
+            email=row.get("email"),
+            source=row.get("source", "batch_import"),
+            channel="batch_import",
+            status="new"
+        )
+        db.add(lead)
+        created_count += 1
+        
+    db.commit()
+    return {"status": "success", "created": created_count, "skipped": skipped_count}
 
 @app.get("/health")
 def health_check():
