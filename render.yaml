@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: asquared-ai-agent
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: GEMINI_PROJECT_ID
+        sync: false
+      - key: GEMINI_LOCATION
+        value: us-central1
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        sync: false # User will upload this as a secret file in the Render dashboard

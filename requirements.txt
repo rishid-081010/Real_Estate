@@ -1,0 +1,6 @@
+fastapi[standard]
+sqlmodel
+google-genai
+pydantic
+pydantic-settings
+uvicorn

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asquared Real Estate - AI Agent Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-64 glass-panel border-r flex flex-col hidden md:flex">
+        <div class="p-6 border-b border-gray-700">
+            <h1 class="text-xl font-bold tracking-wider text-blue-400">Asquared AI</h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="#" class="block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500">Dashboard</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Outbound</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Conversation Logs</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calendar Bookings</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Analytics</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calls</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Integrations</a>
+            <a href="#" class="block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Settings</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6">
+        <header class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold">Overview</h2>
+            <div class="flex items-center space-x-4">
+                <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/50">● System Live</span>
+                <button onclick="fetchData()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-600 text-sm">Refresh Data</button>
+            </div>
+        </header>
+
+        <!-- Top Stat Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <p class="text-gray-400 text-sm mb-1 uppercase tracking-wide">Total Raw Leads</p>
+                <p class="text-3xl font-bold" id="stat-total">0</p>
+            </div>
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <p class="text-gray-400 text-sm mb-1 uppercase tracking-wide">AI-Qualified Leads</p>
+                <p class="text-3xl font-bold text-green-400" id="stat-qualified">0</p>
+            </div>
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <p class="text-gray-400 text-sm mb-1 uppercase tracking-wide">Conversion Rate</p>
+                <p class="text-3xl font-bold text-blue-400" id="stat-rate">0%</p>
+            </div>
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <p class="text-gray-400 text-sm mb-1 uppercase tracking-wide">Meetings Booked</p>
+                <p class="text-3xl font-bold text-purple-400" id="stat-meetings">0</p>
+            </div>
+        </div>
+
+        <!-- Pipeline (Based on Client's CRM Screenshot) -->
+        <div class="glass-panel p-6 rounded-xl shadow-lg">
+            <h3 class="text-lg font-medium mb-4 border-b border-gray-700 pb-2">Lead Pipeline Stages</h3>
+            <div class="flex justify-between items-center text-center">
+                <div class="flex-1">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Fresh Leads</p>
+                    <p class="text-xl font-bold text-blue-300" id="stage-new">0</p>
+                </div>
+                <div class="w-8 border-t border-gray-700"></div>
+                <div class="flex-1">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">In Progress</p>
+                    <p class="text-xl font-bold text-yellow-300" id="stage-engaging">0</p>
+                </div>
+                <div class="w-8 border-t border-gray-700"></div>
+                <div class="flex-1">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Hot / Qualified</p>
+                    <p class="text-xl font-bold text-green-300" id="stage-qualified">0</p>
+                </div>
+                <div class="w-8 border-t border-gray-700"></div>
+                <div class="flex-1">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Ready to Book</p>
+                    <p class="text-xl font-bold text-purple-300" id="stage-handed">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts & Tables Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Source Chart -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg lg:col-span-1">
+                <h3 class="text-lg font-medium mb-4">Inbound Lead Sources</h3>
+                <div class="relative h-48 w-full flex justify-center">
+                    <canvas id="sourceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Upcoming Meetings -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg lg:col-span-2 overflow-hidden flex flex-col">
+                <h3 class="text-lg font-medium mb-4">Upcoming Meetings / Handoffs</h3>
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-700 text-gray-400 text-sm">
+                                <th class="pb-2">Lead Name</th>
+                                <th class="pb-2">Phone</th>
+                                <th class="pb-2">Property Type</th>
+                                <th class="pb-2">Score</th>
+                                <th class="pb-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="meetings-table-body" class="text-sm">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Activity Log -->
+        <div class="glass-panel p-6 rounded-xl shadow-lg flex-1 min-h-[200px]">
+            <h3 class="text-lg font-medium mb-4 border-b border-gray-700 pb-2">Live Automation Log</h3>
+            <div id="activity-log" class="space-y-3 overflow-y-auto max-h-64 pr-2 text-sm text-gray-300">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let chartInstance = null;
+
+        async function fetchData() {
+            try {
+                // Fetch Stats
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+                document.getElementById('stat-total').innerText = stats.total_leads;
+                document.getElementById('stat-qualified').innerText = stats.qualified_leads;
+                document.getElementById('stat-rate').innerText = stats.conversion_rate + '%';
+                document.getElementById('stat-meetings').innerText = stats.meetings_booked;
+
+                // Fetch Leads
+                const leadsRes = await fetch('/api/leads');
+                const leads = await leadsRes.json();
+                
+                // Process Pipeline Counts
+                let cNew = 0, cEngaging = 0, cQual = 0, cHand = 0;
+                let sources = {};
+
+                const logContainer = document.getElementById('activity-log');
+                logContainer.innerHTML = '';
+                const tableBody = document.getElementById('meetings-table-body');
+                tableBody.innerHTML = '';
+
+                leads.forEach(lead => {
+                    // Counts
+                    if(lead.status === 'new') cNew++;
+                    else if(lead.status === 'engaging') cEngaging++;
+                    else if(lead.status === 'qualified') cQual++;
+                    else if(lead.status === 'handed_off') cHand++;
+
+                    // Sources
+                    sources[lead.channel] = (sources[lead.channel] || 0) + 1;
+
+                    // Log (Simulated reverse chron)
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'flex items-center space-x-3 p-2 hover:bg-gray-800 rounded transition';
+                    const timeStr = new Date(lead.updated_at).toLocaleTimeString();
+                    
+                    let actionText = '';
+                    let dotColor = 'bg-blue-500';
+                    if (lead.status === 'new') actionText = `New lead received via ${lead.channel}`;
+                    else if (lead.status === 'engaging') { actionText = `AI is engaging lead`; dotColor = 'bg-yellow-500'; }
+                    else if (lead.status === 'qualified') { actionText = `Lead qualified! Score: ${lead.score}`; dotColor = 'bg-green-500'; }
+                    else if (lead.status === 'handed_off') { actionText = `Handoff complete for meeting.`; dotColor = 'bg-purple-500'; }
+
+                    logEntry.innerHTML = `
+                        <div class="w-2 h-2 rounded-full ${dotColor}"></div>
+                        <div class="text-xs text-gray-500 w-20">${timeStr}</div>
+                        <div><strong>${lead.phone}</strong>: ${actionText}</div>
+                    `;
+                    logContainer.appendChild(logEntry);
+
+                    // Table
+                    if (lead.status === 'qualified' || lead.status === 'handed_off') {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-gray-800 hover:bg-gray-800/50';
+                        tr.innerHTML = `
+                            <td class="py-3">${lead.name || 'Unknown'}</td>
+                            <td class="py-3 text-gray-400">${lead.phone}</td>
+                            <td class="py-3">${lead.property_type || '-'}</td>
+                            <td class="py-3 font-semibold text-green-400">${lead.score}</td>
+                            <td class="py-3">
+                                <span class="px-2 py-1 rounded text-xs bg-gray-700 text-gray-300">
+                                    ${lead.status.toUpperCase()}
+                                </span>
+                            </td>
+                        `;
+                        tableBody.appendChild(tr);
+                    }
+                });
+
+                document.getElementById('stage-new').innerText = cNew;
+                document.getElementById('stage-engaging').innerText = cEngaging;
+                document.getElementById('stage-qualified').innerText = cQual;
+                document.getElementById('stage-handed').innerText = cHand;
+
+                if (Object.keys(sources).length === 0) {
+                    sources = {'No Data': 1};
+                }
+
+                // Render Chart
+                const ctx = document.getElementById('sourceChart').getContext('2d');
+                if (chartInstance) chartInstance.destroy();
+                
+                chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(sources),
+                        datasets: [{
+                            data: Object.values(sources),
+                            backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b'],
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { color: '#cbd5e1', font: { family: 'Inter', size: 11 } }
+                            }
+                        },
+                        cutout: '70%'
+                    }
+                });
+
+            } catch (err) {
+                console.error("Failed to fetch dashboard data", err);
+            }
+        }
+
+        // Init
+        fetchData();
+        setInterval(fetchData, 10000); // Poll every 10s
+    </script>
+</body>
+</html>
