@@ -7,8 +7,14 @@
     "location": "Palm Jumeirah",
     "price_aed": 15000000,
     "agent": "Sarah",
-    "pros": ["Private beach access", "Burj Al Arab view", "Newly renovated"],
-    "cons": ["High maintenance cost"]
+    "pros": [
+      "Private beach access",
+      "Burj Al Arab view",
+      "Newly renovated"
+    ],
+    "cons": [
+      "High maintenance cost"
+    ]
   },
   {
     "id": "2",
@@ -18,8 +24,13 @@
     "location": "Downtown Dubai",
     "price_aed": 3500000,
     "agent": "Ahmed",
-    "pros": ["Walking distance to Dubai Mall", "High floor with Burj Khalifa view"],
-    "cons": ["Heavy traffic during peak hours"]
+    "pros": [
+      "Walking distance to Dubai Mall",
+      "High floor with Burj Khalifa view"
+    ],
+    "cons": [
+      "Heavy traffic during peak hours"
+    ]
   },
   {
     "id": "3",
@@ -29,7 +40,64 @@
     "location": "Arabian Ranches",
     "price_aed": 4200000,
     "agent": "Michael",
-    "pros": ["Quiet neighborhood", "Close to schools", "Private garden"],
-    "cons": ["Further from city center"]
+    "pros": [
+      "Quiet family-friendly neighborhood",
+      "Close to top-rated schools",
+      "Private landscaped garden"
+    ],
+    "cons": [
+      "Further from the beach and city center"
+    ]
+  },
+  {
+    "id": "4",
+    "title": "Luxury Penthouse in Dubai Marina",
+    "property_type": "apartment",
+    "bedrooms": 3,
+    "location": "Dubai Marina",
+    "price_aed": 8500000,
+    "agent": "Elena",
+    "pros": [
+      "Panoramic Marina water views",
+      "Private jacuzzi on the balcony",
+      "Direct access to Dubai Marina Mall"
+    ],
+    "cons": [
+      "High annual building service charges"
+    ]
+  },
+  {
+    "id": "5",
+    "title": "Sleek Studio in Business Bay",
+    "property_type": "apartment",
+    "bedrooms": 0,
+    "location": "Business Bay",
+    "price_aed": 950000,
+    "agent": "Ahmed",
+    "pros": [
+      "Excellent rental yield for investors",
+      "Walking distance to Business Bay Metro",
+      "Fully furnished"
+    ],
+    "cons": [
+      "No balcony, smaller living area"
+    ]
+  },
+  {
+    "id": "6",
+    "title": "Exclusive Mansion in Dubai Hills Estate",
+    "property_type": "villa",
+    "bedrooms": 6,
+    "location": "Dubai Hills Estate",
+    "price_aed": 28000000,
+    "agent": "Sarah",
+    "pros": [
+      "Championship Golf Course views",
+      "Private elevator and basement garage",
+      "State-of-the-art smart home system"
+    ],
+    "cons": [
+      "Under construction (handover Q4 2026)"
+    ]
   }
 ]
