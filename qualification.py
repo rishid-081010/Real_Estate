@@ -18,13 +18,14 @@ def get_client():
     )
 
 class QualificationData(BaseModel):
-    reply: str = Field(description="The next natural, short, WhatsApp/voice-style reply to the user. One question at a time. Warm tone.")
-    budget: Optional[str] = Field(description="Extracted budget if mentioned, else null")
-    timeline: Optional[str] = Field(description="Extracted timeline if mentioned, else null")
-    property_type: Optional[str] = Field(description="Extracted property type (e.g. villa, apartment) if mentioned, else null")
-    location_pref: Optional[str] = Field(description="Extracted location preference if mentioned, else null")
-    ready_for_handoff: bool = Field(description="True if budget, timeline, property_type, and location_pref are all confidently known")
-    summary: Optional[str] = Field(description="A 1-2 sentence summary for the human agent, only provided if ready_for_handoff is true")
+    gist: Optional[str] = Field(None, description="A small 2-3 line gist about the customer which must include(Budget,Property(if decided),Call with an agent/on site visit/none, all other details.")
+    status: str = Field(description="Based on the call gist, you must choose which bucket the client falls into and return the exact word. Options: 'Assigned Leads', 'No Answer', 'In Progress', 'Hot / Qualified', 'Ready To Buy'")
+    score: int = Field(description="Qualification score (0-100)")
+    budget: Optional[str] = Field(None, description="Extracted budget")
+    timeline: Optional[str] = Field(None, description="Extracted timeline")
+    property_type: Optional[str] = Field(None, description="Extracted property type")
+    location_pref: Optional[str] = Field(None, description="Extracted location preference")
+    reply: str = Field(description="The response to say to the user")
 
 def load_knowledge_base():
     try:

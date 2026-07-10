@@ -101,13 +101,24 @@ def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
     # Calculate new score
     lead.score = calculate_score(lead.budget, lead.timeline, lead.property_type, lead.location_pref)
     
-    # Ensure lead status is correctly advanced
-    if lead.status == "fresh_leads":
-        lead.status = "in_progress"
+    # Ensure lead status is updated correctly using the strict status bucket mapping
+    status_map = {
+        "Assigned Leads": "assigned_leads",
+        "No Answer": "no_answer",
+        "In Progress": "in_progress",
+        "Hot / Qualified": "qualified",
+        "Ready To Buy": "ready_to_buy"
+    }
     
-    if qual_data.ready_for_handoff and lead.status not in ["qualified", "ready_to_buy"]:
-        lead.status = "qualified"
-        lead.handoff_note = qual_data.summary
+    if qual_data.status in status_map:
+        lead.status = status_map[qual_data.status]
+    else:
+        # Fallback if LLM halluciantes status
+        if lead.status == "fresh_leads":
+            lead.status = "in_progress"
+            
+    if qual_data.gist:
+        lead.handoff_note = qual_data.gist
         
     db.add(lead)
     
@@ -125,7 +136,7 @@ def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
             "timeline": lead.timeline,
             "property_type": lead.property_type,
             "location_pref": lead.location_pref,
-            "ready_for_handoff": qual_data.ready_for_handoff
+            "gist": qual_data.gist
         }
     }
 
@@ -194,20 +205,36 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
             db.refresh(lead)
 
         # Update extracted data
+        # Update extracted data
         if args.get("budget"): lead.budget = args.get("budget")
         if args.get("timeline"): lead.timeline = args.get("timeline")
         if args.get("property_type"): lead.property_type = args.get("property_type")
         if args.get("location_pref"): lead.location_pref = args.get("location_pref")
         
-        lead.score = calculate_score(lead.budget, lead.timeline, lead.property_type, lead.location_pref)
+        # Handle the new 'gist' argument
+        gist = args.get("gist") or args.get("summary")
+        if gist:
+            lead.handoff_note = gist
+            
+        # Handle the strict 'status' bucket mapping
+        ai_status = args.get("status")
+        status_map = {
+            "Assigned Leads": "assigned_leads",
+            "No Answer": "no_answer",
+            "In Progress": "in_progress",
+            "Hot / Qualified": "qualified",
+            "Ready To Buy": "ready_to_buy"
+        }
         
-        # Determine qualification stage
-        if lead.score >= 70 or args.get("ready_for_handoff"):
-            lead.status = "qualified"
-            if args.get("summary"):
-                lead.handoff_note = args.get("summary")
+        if ai_status and ai_status in status_map:
+            lead.status = status_map[ai_status]
         else:
-            lead.status = "in_progress"
+            # Fallback score-based logic if status wasn't provided perfectly
+            lead.score = calculate_score(lead.budget, lead.timeline, lead.property_type, lead.location_pref)
+            if lead.score >= 70 or args.get("ready_for_handoff"):
+                lead.status = "qualified"
+            else:
+                lead.status = "in_progress"
 
         db.add(lead)
         db.commit()
