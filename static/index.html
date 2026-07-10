@@ -68,13 +68,18 @@
             <h3 class="text-lg font-medium mb-4 border-b border-gray-700 pb-2">Lead Pipeline Stages</h3>
             <div class="flex justify-between items-center text-center">
                 <div class="flex-1">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Fresh Leads</p>
-                    <p class="text-xl font-bold text-blue-300" id="stage-new">0</p>
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Assigned Leads</p>
+                    <p class="text-xl font-bold text-blue-300" id="stage-assigned">0</p>
+                </div>
+                <div class="w-8 border-t border-gray-700"></div>
+                <div class="flex-1">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">No Answer</p>
+                    <p class="text-xl font-bold text-red-400" id="stage-no-answer">0</p>
                 </div>
                 <div class="w-8 border-t border-gray-700"></div>
                 <div class="flex-1">
                     <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">In Progress</p>
-                    <p class="text-xl font-bold text-yellow-300" id="stage-engaging">0</p>
+                    <p class="text-xl font-bold text-yellow-300" id="stage-in-progress">0</p>
                 </div>
                 <div class="w-8 border-t border-gray-700"></div>
                 <div class="flex-1">
@@ -83,8 +88,8 @@
                 </div>
                 <div class="w-8 border-t border-gray-700"></div>
                 <div class="flex-1">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Ready to Book</p>
-                    <p class="text-xl font-bold text-purple-300" id="stage-handed">0</p>
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Ready To Buy</p>
+                    <p class="text-xl font-bold text-purple-300" id="stage-ready-to-buy">0</p>
                 </div>
             </div>
         </div>
@@ -289,7 +294,7 @@
                 const leads = await leadsRes.json();
                 
                 // Process Pipeline Counts
-                let cNew = 0, cEngaging = 0, cQual = 0, cHand = 0;
+                let cAssigned = 0, cNoAnswer = 0, cInProgress = 0, cQualified = 0, cReadyToBuy = 0;
                 let sources = {};
 
                 const logContainer = document.getElementById('activity-log');
@@ -299,10 +304,11 @@
 
                 leads.forEach(lead => {
                     // Counts
-                    if(lead.status === 'new') cNew++;
-                    else if(lead.status === 'engaging') cEngaging++;
-                    else if(lead.status === 'qualified') cQual++;
-                    else if(lead.status === 'handed_off') cHand++;
+                    if (lead.status === 'fresh_leads' || lead.status === 'assigned_leads') cAssigned++;
+                    else if (lead.status === 'no_answer') cNoAnswer++;
+                    else if (lead.status === 'in_progress') cInProgress++;
+                    else if (lead.status === 'qualified') cQualified++;
+                    else if (lead.status === 'ready_to_buy') cReadyToBuy++;
 
                     // Sources
                     sources[lead.source || 'unknown'] = (sources[lead.source || 'unknown'] || 0) + 1;
@@ -314,10 +320,11 @@
                     
                     let actionText = '';
                     let dotColor = 'bg-blue-500';
-                    if (lead.status === 'new') actionText = `New lead created via ${lead.channel} from source: ${lead.source}`;
-                    else if (lead.status === 'engaging') { actionText = `AI is engaging lead via ${lead.channel}`; dotColor = 'bg-yellow-500'; }
+                    if (lead.status === 'fresh_leads' || lead.status === 'assigned_leads') actionText = `Lead assigned via ${lead.channel} from source: ${lead.source}`;
+                    else if (lead.status === 'no_answer') { actionText = `Call unanswered. Falling back to WhatsApp...`; dotColor = 'bg-red-500'; }
+                    else if (lead.status === 'in_progress') { actionText = `AI is engaging lead via ${lead.channel}`; dotColor = 'bg-yellow-500'; }
                     else if (lead.status === 'qualified') { actionText = `Lead qualified! Score: ${lead.score}`; dotColor = 'bg-green-500'; }
-                    else if (lead.status === 'handed_off') { actionText = `Handoff complete. Meeting booked.`; dotColor = 'bg-purple-500'; }
+                    else if (lead.status === 'ready_to_buy') { actionText = `Handoff complete. Ready to Buy.`; dotColor = 'bg-purple-500'; }
 
                     logEntry.innerHTML = `
                         <div class="w-2 h-2 rounded-full ${dotColor}"></div>
@@ -327,7 +334,7 @@
                     logContainer.appendChild(logEntry);
 
                     // Table
-                    if (lead.status === 'qualified' || lead.status === 'handed_off') {
+                    if (lead.status === 'qualified' || lead.status === 'ready_to_buy') {
                         const tr = document.createElement('tr');
                         tr.className = 'border-b border-gray-800 hover:bg-gray-800/50';
                         tr.innerHTML = `
@@ -345,10 +352,11 @@
                     }
                 });
 
-                document.getElementById('stage-new').innerText = cNew;
-                document.getElementById('stage-engaging').innerText = cEngaging;
-                document.getElementById('stage-qualified').innerText = cQual;
-                document.getElementById('stage-handed').innerText = cHand;
+                document.getElementById('stage-assigned').innerText = cAssigned;
+                document.getElementById('stage-no-answer').innerText = cNoAnswer;
+                document.getElementById('stage-in-progress').innerText = cInProgress;
+                document.getElementById('stage-qualified').innerText = cQualified;
+                document.getElementById('stage-ready-to-buy').innerText = cReadyToBuy;
 
                 if (Object.keys(sources).length === 0) {
                     sources = {'No Data': 1};
