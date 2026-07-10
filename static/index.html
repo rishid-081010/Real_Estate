@@ -24,7 +24,7 @@
         <nav class="flex-1 p-4 space-y-2">
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500">Dashboard</button>
             <button onclick="switchTab('outbound')" id="nav-outbound" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Outbound</button>
-            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Conversation Logs</button>
+            <button onclick="switchTab('crm')" id="nav-crm" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">CRM View</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calendar Bookings</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Analytics</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calls</button>
@@ -186,26 +186,87 @@
         </div>
     </main>
 
+    <!-- Main Content Panel (CRM Kanban) -->
+    <main id="panel-crm" class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6 hidden">
+        <header class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold">CRM Kanban Board</h2>
+            <div class="flex items-center space-x-4">
+                <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/50">● Connected</span>
+                <button onclick="fetchData()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-600 text-sm">Refresh Kanban</button>
+            </div>
+        </header>
+
+        <!-- Kanban board grid -->
+        <div class="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 min-h-[500px]">
+            <!-- Column 1 -->
+            <div class="glass-panel p-4 rounded-xl flex flex-col space-y-3 bg-slate-900/40">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <h4 class="font-bold text-sm text-blue-400">Assigned Leads</h4>
+                    <span id="count-kanban-assigned" class="bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                </div>
+                <div id="kanban-assigned" class="space-y-3 overflow-y-auto flex-1 max-h-[calc(100vh-250px)] pr-1"></div>
+            </div>
+            <!-- Column 2 -->
+            <div class="glass-panel p-4 rounded-xl flex flex-col space-y-3 bg-slate-900/40">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <h4 class="font-bold text-sm text-red-400">No Answer</h4>
+                    <span id="count-kanban-no-answer" class="bg-red-600/20 text-red-400 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                </div>
+                <div id="kanban-no-answer" class="space-y-3 overflow-y-auto flex-1 max-h-[calc(100vh-250px)] pr-1"></div>
+            </div>
+            <!-- Column 3 -->
+            <div class="glass-panel p-4 rounded-xl flex flex-col space-y-3 bg-slate-900/40">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <h4 class="font-bold text-sm text-yellow-400">In Progress</h4>
+                    <span id="count-kanban-in-progress" class="bg-yellow-600/20 text-yellow-400 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                </div>
+                <div id="kanban-in-progress" class="space-y-3 overflow-y-auto flex-1 max-h-[calc(100vh-250px)] pr-1"></div>
+            </div>
+            <!-- Column 4 -->
+            <div class="glass-panel p-4 rounded-xl flex flex-col space-y-3 bg-slate-900/40">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <h4 class="font-bold text-sm text-green-400">Hot / Qualified</h4>
+                    <span id="count-kanban-qualified" class="bg-green-600/20 text-green-400 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                </div>
+                <div id="kanban-qualified" class="space-y-3 overflow-y-auto flex-1 max-h-[calc(100vh-250px)] pr-1"></div>
+            </div>
+            <!-- Column 5 -->
+            <div class="glass-panel p-4 rounded-xl flex flex-col space-y-3 bg-slate-900/40">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <h4 class="font-bold text-sm text-purple-400">Ready To Buy</h4>
+                    <span id="count-kanban-ready-to-buy" class="bg-purple-600/20 text-purple-400 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                </div>
+                <div id="kanban-ready-to-buy" class="space-y-3 overflow-y-auto flex-1 max-h-[calc(100vh-250px)] pr-1"></div>
+            </div>
+        </div>
+
     <script>
         let chartInstance = null;
 
         function switchTab(tab) {
-            const dashPanel = document.getElementById('panel-dashboard');
-            const outboundPanel = document.getElementById('panel-outbound');
-            const navDash = document.getElementById('nav-dashboard');
-            const navOut = document.getElementById('nav-outbound');
+            const panels = {
+                dashboard: document.getElementById('panel-dashboard'),
+                outbound: document.getElementById('panel-outbound'),
+                crm: document.getElementById('panel-crm')
+            };
+            const navs = {
+                dashboard: document.getElementById('nav-dashboard'),
+                outbound: document.getElementById('nav-outbound'),
+                crm: document.getElementById('nav-crm')
+            };
 
-            if (tab === 'dashboard') {
-                dashPanel.classList.remove('hidden');
-                outboundPanel.classList.add('hidden');
-                navDash.className = "w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500";
-                navOut.className = "w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition";
+            Object.keys(panels).forEach(k => {
+                if (k === tab) {
+                    panels[k].classList.remove('hidden');
+                    navs[k].className = "w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500";
+                } else {
+                    panels[k].classList.add('hidden');
+                    navs[k].className = "w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition";
+                }
+            });
+
+            if (tab === 'dashboard' || tab === 'crm') {
                 fetchData();
-            } else {
-                dashPanel.classList.add('hidden');
-                outboundPanel.classList.remove('hidden');
-                navDash.className = "w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition";
-                navOut.className = "w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500";
             }
         }
 
@@ -302,13 +363,29 @@
                 const tableBody = document.getElementById('meetings-table-body');
                 tableBody.innerHTML = '';
 
+                // Kanban DOM containers
+                const kanbanAssigned = document.getElementById('kanban-assigned');
+                const kanbanNoAnswer = document.getElementById('kanban-no-answer');
+                const kanbanInProgress = document.getElementById('kanban-in-progress');
+                const kanbanQualified = document.getElementById('kanban-qualified');
+                const kanbanReadyToBuy = document.getElementById('kanban-ready-to-buy');
+
+                kanbanAssigned.innerHTML = '';
+                kanbanNoAnswer.innerHTML = '';
+                kanbanInProgress.innerHTML = '';
+                kanbanQualified.innerHTML = '';
+                kanbanReadyToBuy.innerHTML = '';
+
                 leads.forEach(lead => {
+                    const status = lead.status;
+                    const isAssigned = (status === 'fresh_leads' || status === 'assigned_leads');
+                    
                     // Counts
-                    if (lead.status === 'fresh_leads' || lead.status === 'assigned_leads') cAssigned++;
-                    else if (lead.status === 'no_answer') cNoAnswer++;
-                    else if (lead.status === 'in_progress') cInProgress++;
-                    else if (lead.status === 'qualified') cQualified++;
-                    else if (lead.status === 'ready_to_buy') cReadyToBuy++;
+                    if (isAssigned) cAssigned++;
+                    else if (status === 'no_answer') cNoAnswer++;
+                    else if (status === 'in_progress') cInProgress++;
+                    else if (status === 'qualified') cQualified++;
+                    else if (status === 'ready_to_buy') cReadyToBuy++;
 
                     // Sources
                     sources[lead.source || 'unknown'] = (sources[lead.source || 'unknown'] || 0) + 1;
@@ -320,11 +397,11 @@
                     
                     let actionText = '';
                     let dotColor = 'bg-blue-500';
-                    if (lead.status === 'fresh_leads' || lead.status === 'assigned_leads') actionText = `Lead assigned via ${lead.channel} from source: ${lead.source}`;
-                    else if (lead.status === 'no_answer') { actionText = `Call unanswered. Falling back to WhatsApp...`; dotColor = 'bg-red-500'; }
-                    else if (lead.status === 'in_progress') { actionText = `AI is engaging lead via ${lead.channel}`; dotColor = 'bg-yellow-500'; }
-                    else if (lead.status === 'qualified') { actionText = `Lead qualified! Score: ${lead.score}`; dotColor = 'bg-green-500'; }
-                    else if (lead.status === 'ready_to_buy') { actionText = `Handoff complete. Ready to Buy.`; dotColor = 'bg-purple-500'; }
+                    if (isAssigned) actionText = `Lead assigned via ${lead.channel} from source: ${lead.source}`;
+                    else if (status === 'no_answer') { actionText = `Call unanswered. Falling back to WhatsApp...`; dotColor = 'bg-red-500'; }
+                    else if (status === 'in_progress') { actionText = `AI is engaging lead via ${lead.channel}`; dotColor = 'bg-yellow-500'; }
+                    else if (status === 'qualified') { actionText = `Lead qualified! Score: ${lead.score}`; dotColor = 'bg-green-500'; }
+                    else if (status === 'ready_to_buy') { actionText = `Handoff complete. Ready to Buy.`; dotColor = 'bg-purple-500'; }
 
                     logEntry.innerHTML = `
                         <div class="w-2 h-2 rounded-full ${dotColor}"></div>
@@ -333,8 +410,41 @@
                     `;
                     logContainer.appendChild(logEntry);
 
+                    // Create Kanban Card HTML
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-800/80 p-4 rounded-lg border border-gray-700 shadow flex flex-col space-y-2 hover:border-gray-500 transition text-[11px]';
+                    
+                    const timeAgoStr = new Date(lead.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const dateStr = new Date(lead.updated_at).toLocaleDateString([], {month: 'short', day: 'numeric'});
+                    
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <span class="font-bold text-slate-200">${lead.name || 'Unknown'}_${lead.id}</span>
+                            <span class="text-[9px] text-gray-500">${dateStr} ${timeAgoStr}</span>
+                        </div>
+                        <div class="text-blue-400 font-bold text-sm">Dh${lead.budget || '0'}</div>
+                        <div class="flex flex-col text-gray-400 space-y-1">
+                            <span>Source: <strong>${lead.source || 'unknown'}</strong></span>
+                            <span>Responsible: <strong>AI Agent</strong></span>
+                        </div>
+                        ${lead.handoff_note ? `<div class="bg-slate-900/50 p-2 rounded text-gray-400 border-l-2 border-blue-500 mt-1 italic text-[10px]">${lead.handoff_note}</div>` : ''}
+                        <div class="pt-2 border-t border-gray-700 flex justify-between items-center mt-1">
+                            <span class="text-[9px] text-gray-500 capitalize">Via: ${lead.channel}</span>
+                            <a href="https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}" target="_blank" class="text-green-400 hover:text-green-300 font-semibold flex items-center space-x-1">
+                                <span>WhatsApp Link</span>
+                            </a>
+                        </div>
+                    `;
+
+                    // Append to respective Kanban column
+                    if (isAssigned) kanbanAssigned.appendChild(card);
+                    else if (status === 'no_answer') kanbanNoAnswer.appendChild(card);
+                    else if (status === 'in_progress') kanbanInProgress.appendChild(card);
+                    else if (status === 'qualified') kanbanQualified.appendChild(card);
+                    else if (status === 'ready_to_buy') kanbanReadyToBuy.appendChild(card);
+
                     // Table
-                    if (lead.status === 'qualified' || lead.status === 'ready_to_buy') {
+                    if (status === 'qualified' || status === 'ready_to_buy') {
                         const tr = document.createElement('tr');
                         tr.className = 'border-b border-gray-800 hover:bg-gray-800/50';
                         tr.innerHTML = `
@@ -357,6 +467,12 @@
                 document.getElementById('stage-in-progress').innerText = cInProgress;
                 document.getElementById('stage-qualified').innerText = cQualified;
                 document.getElementById('stage-ready-to-buy').innerText = cReadyToBuy;
+
+                document.getElementById('count-kanban-assigned').innerText = cAssigned;
+                document.getElementById('count-kanban-no-answer').innerText = cNoAnswer;
+                document.getElementById('count-kanban-in-progress').innerText = cInProgress;
+                document.getElementById('count-kanban-qualified').innerText = cQualified;
+                document.getElementById('count-kanban-ready-to-buy').innerText = cReadyToBuy;
 
                 if (Object.keys(sources).length === 0) {
                     sources = {'No Data': 1};
