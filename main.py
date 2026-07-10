@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 import csv
 import io
+import os
+import requests
 from typing import Optional
-from fastapi import FastAPI, Depends, UploadFile, File
+from fastapi import FastAPI, Depends, UploadFile, File, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
@@ -27,10 +29,39 @@ class LeadFormRequest(BaseModel):
     email: Optional[str] = None
     source: Optional[str] = "form"
 
-class RetellWebhookRequest(BaseModel):
-    call_id: str
-    function_name: str
-    function_arguments: dict
+# Helper for sending WhatsApp message via Meta Cloud API
+def send_whatsapp_message(to_phone: str, text: str):
+    token = os.environ.get("WHATSAPP_ACCESS_TOKEN")
+    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+    
+    if not token or not phone_number_id:
+        print("[WhatsApp Mock] No credentials. Would send message to", to_phone, ":", text)
+        return False
+        
+    url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to_phone,
+        "type": "text",
+        "text": {
+            "body": text
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print("[WhatsApp API] Status:", response.status_code, response.text)
+        return response.status_code == 200
+    except Exception as e:
+        print("[WhatsApp API] Error:", str(e))
+        return False
+
+# --- Webhook endpoints ---
 
 @app.post("/chat/test")
 def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
@@ -39,7 +70,7 @@ def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
     lead = db.exec(statement).first()
     
     if not lead:
-        lead = Lead(phone=req.phone, channel="test")
+        lead = Lead(phone=req.phone, channel="test", status="fresh_leads")
         db.add(lead)
         db.commit()
         db.refresh(lead)
@@ -71,10 +102,10 @@ def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
     lead.score = calculate_score(lead.budget, lead.timeline, lead.property_type, lead.location_pref)
     
     # Ensure lead status is correctly advanced
-    if lead.status == "new":
-        lead.status = "engaging"
+    if lead.status == "fresh_leads":
+        lead.status = "in_progress"
     
-    if qual_data.ready_for_handoff and lead.status != "handed_off":
+    if qual_data.ready_for_handoff and lead.status not in ["qualified", "ready_to_buy"]:
         lead.status = "qualified"
         lead.handoff_note = qual_data.summary
         
@@ -98,78 +129,95 @@ def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
         }
     }
 
-# --- Dashboard APIs ---
-
-@app.get("/api/stats")
-def get_dashboard_stats(db: Session = Depends(get_session)):
-    leads = db.exec(select(Lead)).all()
-    total_leads = len(leads)
-    qualified_leads = len([l for l in leads if l.status in ["qualified", "handed_off"]])
-    conversion_rate = round((qualified_leads / total_leads * 100) if total_leads > 0 else 0, 1)
-    meetings_booked = len([l for l in leads if l.status == "handed_off"])
-    
-    return {
-        "total_leads": total_leads,
-        "qualified_leads": qualified_leads,
-        "conversion_rate": conversion_rate,
-        "meetings_booked": meetings_booked
-    }
-
-@app.get("/api/leads")
-def get_dashboard_leads(db: Session = Depends(get_session)):
-    leads = db.exec(select(Lead).order_by(Lead.created_at.desc())).all()
-    return leads
-
-@app.get("/api/meetings")
-def get_dashboard_meetings(db: Session = Depends(get_session)):
-    # Simulating meetings for any lead that is handed_off or qualified
-    meetings = db.exec(select(Lead).where(Lead.status.in_(["qualified", "handed_off"]))).all()
-    return meetings
-
-# --- Webhooks ---
-
+# Retell Call webhook & Custom Function handler
+# Supports both:
+# 1. Custom Tool Call payload: { "call_id": "...", "function_name": "...", "function_arguments": {...} }
+# 2. General Call Ended Event: { "event": "call_ended", "call": { "call_id": "...", "disposition": "...", "from_number": "..." } }
 @app.post("/webhook/retell")
-def retell_webhook(req: RetellWebhookRequest, db: Session = Depends(get_session)):
-    args = req.function_arguments
-    phone = args.get("phone")
-    if not phone:
-        return {"status": "error", "message": "Phone number required"}
+async def retell_webhook(request: Request, db: Session = Depends(get_session)):
+    body = await request.json()
+    print("[Retell Webhook] Received payload:", body)
 
-    # Find lead
-    statement = select(Lead).where(Lead.phone == phone)
-    lead = db.exec(statement).first()
-    
-    if not lead:
-        # Create lead if not exists
-        lead = Lead(phone=phone, channel="voice")
+    # CASE A: Call Ended Event (e.g. tracking if they answered or not)
+    if body.get("event") == "call_ended":
+        call_info = body.get("call", {})
+        phone = call_info.get("from_number") or call_info.get("to_number")
+        disposition = call_info.get("disposition")
+
+        if not phone:
+            return {"status": "ignored", "reason": "No phone number found in call ended event"}
+
+        # Find or create lead
+        statement = select(Lead).where(Lead.phone == phone)
+        lead = db.exec(statement).first()
+        if not lead:
+            lead = Lead(phone=phone, channel="voice", status="fresh_leads")
+            db.add(lead)
+            db.commit()
+            db.refresh(lead)
+
+        # Update status based on Retell call disposition
+        if disposition in ["no-answer", "busy", "voicemail", "failed"]:
+            lead.status = "no_answer"
+            db.add(lead)
+            db.commit()
+            
+            # MANDATORY FALLBACK: Auto trigger WhatsApp outreach
+            fallback_text = (
+                f"Hi {lead.name or 'there'}, we tried calling you regarding your property inquiry on {lead.source or 'Property Finder'}. "
+                "Since we couldn't reach you, feel free to text us here to find the perfect property!"
+            )
+            send_whatsapp_message(lead.phone, fallback_text)
+            
+        elif lead.status == "fresh_leads" or lead.status == "assigned_leads":
+            # If they picked up but we haven't qualified them yet
+            lead.status = "in_progress"
+            db.add(lead)
+            db.commit()
+
+        return {"status": "success", "event": "call_ended", "disposition": disposition}
+
+    # CASE B: Custom Function Call from Voice Agent (mid-call or end-call extraction)
+    elif "function_arguments" in body:
+        args = body.get("function_arguments", {})
+        phone = args.get("phone")
+        if not phone:
+            return {"status": "error", "message": "Phone number required"}
+
+        # Find or create lead
+        statement = select(Lead).where(Lead.phone == phone)
+        lead = db.exec(statement).first()
+        if not lead:
+            lead = Lead(phone=phone, channel="voice", status="fresh_leads")
+            db.add(lead)
+            db.commit()
+            db.refresh(lead)
+
+        # Update extracted data
+        if args.get("budget"): lead.budget = args.get("budget")
+        if args.get("timeline"): lead.timeline = args.get("timeline")
+        if args.get("property_type"): lead.property_type = args.get("property_type")
+        if args.get("location_pref"): lead.location_pref = args.get("location_pref")
+        
+        lead.score = calculate_score(lead.budget, lead.timeline, lead.property_type, lead.location_pref)
+        
+        # Determine qualification stage
+        if lead.score >= 70 or args.get("ready_for_handoff"):
+            lead.status = "qualified"
+            if args.get("summary"):
+                lead.handoff_note = args.get("summary")
+        else:
+            lead.status = "in_progress"
+
         db.add(lead)
         db.commit()
-        db.refresh(lead)
 
-    # Update extracted data
-    if args.get("budget"): lead.budget = args.get("budget")
-    if args.get("timeline"): lead.timeline = args.get("timeline")
-    if args.get("property_type"): lead.property_type = args.get("property_type")
-    if args.get("location_pref"): lead.location_pref = args.get("location_pref")
-    
-    lead.score = calculate_score(lead.budget, lead.timeline, lead.property_type, lead.location_pref)
-    
-    # Process handoff
-    if lead.score >= 70 or args.get("ready_for_handoff"):
-        lead.status = "qualified"
-        if args.get("summary"):
-            lead.handoff_note = args.get("summary")
-    else:
-        lead.status = "engaging"
+        return {"status": "success", "message": "Data saved"}
 
-    db.add(lead)
-    db.commit()
-
-    return {"status": "success", "message": "Data saved"}
+    return {"status": "ignored", "reason": "Unknown payload structure"}
 
 @app.post("/api/leads/form")
 def create_lead_form(req: LeadFormRequest, db: Session = Depends(get_session)):
-    # Standardize phone lookup
     statement = select(Lead).where(Lead.phone == req.phone)
     lead = db.exec(statement).first()
     if lead:
@@ -181,14 +229,11 @@ def create_lead_form(req: LeadFormRequest, db: Session = Depends(get_session)):
         email=req.email,
         source=req.source,
         channel="form",
-        status="new"
+        status="fresh_leads"
     )
     db.add(lead)
     db.commit()
     db.refresh(lead)
-    
-    # In later stages, this triggers Bitrix24 creation:
-    # create_bitrix_lead(lead)
     
     return {"status": "success", "lead_id": lead.id}
 
@@ -218,13 +263,40 @@ async def create_leads_batch(file: UploadFile = File(...), db: Session = Depends
             email=row.get("email"),
             source=row.get("source", "batch_import"),
             channel="batch_import",
-            status="new"
+            status="fresh_leads"
         )
         db.add(lead)
         created_count += 1
         
     db.commit()
     return {"status": "success", "created": created_count, "skipped": skipped_count}
+
+# --- Dashboard APIs ---
+
+@app.get("/api/stats")
+def get_dashboard_stats(db: Session = Depends(get_session)):
+    leads = db.exec(select(Lead)).all()
+    total_leads = len(leads)
+    qualified_leads = len([l for l in leads if l.status in ["qualified", "ready_to_buy"]])
+    conversion_rate = round((qualified_leads / total_leads * 100) if total_leads > 0 else 0, 1)
+    meetings_booked = len([l for l in leads if l.status == "ready_to_buy"])
+    
+    return {
+        "total_leads": total_leads,
+        "qualified_leads": qualified_leads,
+        "conversion_rate": conversion_rate,
+        "meetings_booked": meetings_booked
+    }
+
+@app.get("/api/leads")
+def get_dashboard_leads(db: Session = Depends(get_session)):
+    leads = db.exec(select(Lead).order_by(Lead.created_at.desc())).all()
+    return leads
+
+@app.get("/api/meetings")
+def get_dashboard_meetings(db: Session = Depends(get_session)):
+    meetings = db.exec(select(Lead).where(Lead.status.in_(["qualified", "ready_to_buy"]))).all()
+    return meetings
 
 @app.get("/health")
 def health_check():
