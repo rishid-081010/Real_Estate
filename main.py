@@ -258,8 +258,8 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
         db.commit()
 
         # Create a calendar booking if date and time were provided
-        booking_date = args.get("date")
-        booking_time = args.get("time")
+        booking_date = args.get("date") or args.get("Date")
+        booking_time = args.get("time") or args.get("Time")
         if booking_date and booking_time and booking_date != "N/A" and booking_time != "N/A":
             # Detect booking type from gist
             gist_lower = (gist or "").lower()
