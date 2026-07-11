@@ -24,10 +24,15 @@ class Lead(SQLModel, table=True):
 class Message(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
-    role: str # "user" or "assistant"
+    role: str # "user", "assistant", "system"
     content: str
-    channel: str # "whatsapp" or "voice"
+    channel: str # e.g., "whatsapp", "voice", "form"
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class WebhookLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    payload: str
 
 # Use SQLite for now (Render Postgres can be swapped in later)
 sqlite_file_name = "database.sqlite"

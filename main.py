@@ -9,7 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
-from database import create_db_and_tables, get_session, Lead, Message
+import json
+from database import create_db_and_tables, get_session, Lead, Message, WebhookLog
 from qualification import generate_qualification_response, calculate_score
 
 @asynccontextmanager
@@ -148,6 +149,10 @@ def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
 async def retell_webhook(request: Request, db: Session = Depends(get_session)):
     body = await request.json()
     print("[Retell Webhook] Received payload:", body)
+    
+    # Save raw webhook log
+    db.add(WebhookLog(payload=json.dumps(body)))
+    db.commit()
 
     # CASE A: Call Ended Event (e.g. tracking if they answered or not)
     if body.get("event") == "call_ended":
@@ -324,6 +329,11 @@ def get_dashboard_leads(db: Session = Depends(get_session)):
 def get_dashboard_meetings(db: Session = Depends(get_session)):
     meetings = db.exec(select(Lead).where(Lead.status.in_(["qualified", "ready_to_buy"]))).all()
     return meetings
+
+@app.get("/api/logs/webhooks")
+def get_webhook_logs(db: Session = Depends(get_session)):
+    logs = db.exec(select(WebhookLog).order_by(WebhookLog.created_at.desc()).limit(50)).all()
+    return logs
 
 @app.get("/health")
 def health_check():

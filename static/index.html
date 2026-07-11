@@ -25,6 +25,7 @@
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full text-left block px-4 py-2 rounded bg-blue-600/20 text-blue-400 font-semibold border-l-4 border-blue-500">Dashboard</button>
             <button onclick="switchTab('outbound')" id="nav-outbound" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Outbound</button>
             <button onclick="switchTab('crm')" id="nav-crm" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">CRM View</button>
+            <button onclick="switchTab('webhooks')" id="nav-webhooks" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Webhook Logs</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calendar Bookings</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Analytics</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calls</button>
@@ -239,6 +240,25 @@
                 <div id="kanban-ready-to-buy" class="space-y-3 overflow-y-auto flex-1 max-h-[calc(100vh-250px)] pr-1"></div>
             </div>
         </div>
+    </main>
+
+    <!-- Main Content Panel (Webhook Logs) -->
+    <main id="panel-webhooks" class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6 hidden">
+        <header class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold">Raw Webhook Logs</h2>
+            <div class="flex items-center space-x-4">
+                <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/50">● Live Polling</span>
+                <button onclick="fetchData()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-600 text-sm">Refresh Logs</button>
+            </div>
+        </header>
+        
+        <div class="glass-panel p-6 rounded-xl shadow-lg flex-1 flex flex-col font-mono text-sm bg-black/60 border border-gray-700 overflow-hidden">
+            <h3 class="text-gray-400 mb-4 uppercase tracking-widest border-b border-gray-800 pb-2">Incoming Payloads (from Retell)</h3>
+            <div id="webhook-log-container" class="space-y-4 overflow-y-auto flex-1 pr-2 text-green-400">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </main>
 
     <script>
         let chartInstance = null;
@@ -247,12 +267,14 @@
             const panels = {
                 dashboard: document.getElementById('panel-dashboard'),
                 outbound: document.getElementById('panel-outbound'),
-                crm: document.getElementById('panel-crm')
+                crm: document.getElementById('panel-crm'),
+                webhooks: document.getElementById('panel-webhooks')
             };
             const navs = {
                 dashboard: document.getElementById('nav-dashboard'),
                 outbound: document.getElementById('nav-outbound'),
-                crm: document.getElementById('nav-crm')
+                crm: document.getElementById('nav-crm'),
+                webhooks: document.getElementById('nav-webhooks')
             };
 
             Object.keys(panels).forEach(k => {
@@ -473,6 +495,30 @@
                 document.getElementById('count-kanban-in-progress').innerText = cInProgress;
                 document.getElementById('count-kanban-qualified').innerText = cQualified;
                 document.getElementById('count-kanban-ready-to-buy').innerText = cReadyToBuy;
+
+                // Fetch Webhook Logs
+                const webhookRes = await fetch('/api/logs/webhooks');
+                const webhooks = await webhookRes.json();
+                const webhookContainer = document.getElementById('webhook-log-container');
+                webhookContainer.innerHTML = '';
+                webhooks.forEach(wh => {
+                    const div = document.createElement('div');
+                    div.className = 'border-b border-gray-800 pb-3';
+                    const timeStr = new Date(wh.created_at).toLocaleString();
+                    
+                    let formattedJson = "{}";
+                    try {
+                        formattedJson = JSON.stringify(JSON.parse(wh.payload), null, 2);
+                    } catch(e) {
+                        formattedJson = wh.payload;
+                    }
+                    
+                    div.innerHTML = `
+                        <div class="text-gray-500 text-xs mb-1">[${timeStr}] Webhook Received</div>
+                        <pre class="bg-gray-900 p-3 rounded text-[11px] overflow-x-auto text-blue-300">${formattedJson}</pre>
+                    `;
+                    webhookContainer.appendChild(div);
+                });
 
                 if (Object.keys(sources).length === 0) {
                     sources = {'No Data': 1};
