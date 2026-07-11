@@ -34,6 +34,17 @@ class WebhookLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     payload: str
 
+class Booking(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lead_id: Optional[int] = Field(default=None, foreign_key="lead.id")
+    username: str
+    booking_type: str = "agent_call"  # "agent_call" or "site_visit"
+    date: str  # DD/MM/YYYY
+    time: str  # HH:MM (24h)
+    gist: Optional[str] = None
+    status: str = "confirmed"  # confirmed, completed, cancelled
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 # Use SQLite for now (Render Postgres can be swapped in later)
 sqlite_file_name = "database.sqlite"
 sqlite_url = f"sqlite:///{sqlite_file_name}"

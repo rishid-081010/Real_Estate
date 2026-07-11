@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
 import json
-from database import create_db_and_tables, get_session, Lead, Message, WebhookLog
+from database import create_db_and_tables, get_session, Lead, Message, WebhookLog, Booking
 from qualification import generate_qualification_response, calculate_score
 
 @asynccontextmanager
@@ -257,6 +257,28 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
         db.add(lead)
         db.commit()
 
+        # Create a calendar booking if date and time were provided
+        booking_date = args.get("date")
+        booking_time = args.get("time")
+        if booking_date and booking_time and booking_date != "N/A" and booking_time != "N/A":
+            # Detect booking type from gist
+            gist_lower = (gist or "").lower()
+            if "site" in gist_lower or "visit" in gist_lower or "viewing" in gist_lower:
+                booking_type = "site_visit"
+            else:
+                booking_type = "agent_call"
+            
+            booking = Booking(
+                lead_id=lead.id,
+                username=username or f"{lead.name or 'Unknown'}_{lead.id}",
+                booking_type=booking_type,
+                date=booking_date,
+                time=booking_time,
+                gist=gist
+            )
+            db.add(booking)
+            db.commit()
+
         return {"status": "success", "message": "Data saved"}
 
     return {"status": "ignored", "reason": "Unknown payload structure"}
@@ -324,7 +346,7 @@ def get_dashboard_stats(db: Session = Depends(get_session)):
     total_leads = len(leads)
     qualified_leads = len([l for l in leads if l.status in ["qualified", "ready_to_buy"]])
     conversion_rate = round((qualified_leads / total_leads * 100) if total_leads > 0 else 0, 1)
-    meetings_booked = len([l for l in leads if l.status == "ready_to_buy"])
+    meetings_booked = len(db.exec(select(Booking)).all())
     
     return {
         "total_leads": total_leads,
@@ -347,6 +369,11 @@ def get_dashboard_meetings(db: Session = Depends(get_session)):
 def get_webhook_logs(db: Session = Depends(get_session)):
     logs = db.exec(select(WebhookLog).order_by(WebhookLog.created_at.desc()).limit(50)).all()
     return logs
+
+@app.get("/api/bookings")
+def get_bookings(db: Session = Depends(get_session)):
+    bookings = db.exec(select(Booking).order_by(Booking.created_at.desc())).all()
+    return bookings
 
 @app.get("/health")
 def health_check():

@@ -26,7 +26,7 @@
             <button onclick="switchTab('outbound')" id="nav-outbound" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Outbound</button>
             <button onclick="switchTab('crm')" id="nav-crm" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">CRM View</button>
             <button onclick="switchTab('webhooks')" id="nav-webhooks" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Webhook Logs</button>
-            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calendar Bookings</button>
+            <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calendar Bookings</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Analytics</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calls</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Integrations</button>
@@ -260,21 +260,56 @@
         </div>
     </main>
 
+    <!-- Main Content Panel (Calendar Bookings) -->
+    <main id="panel-calendar" class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-4 hidden">
+        <header class="flex justify-between items-center mb-2">
+            <h2 class="text-2xl font-semibold">Calendar Bookings</h2>
+            <div class="flex items-center space-x-3">
+                <button onclick="calendarPrevWeek()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-600 text-sm">← Prev</button>
+                <button onclick="calendarToday()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded transition text-sm font-semibold">Today</button>
+                <button onclick="calendarNextWeek()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-600 text-sm">Next →</button>
+                <span id="calendar-week-label" class="text-gray-400 text-sm ml-3 font-medium"></span>
+            </div>
+        </header>
+
+        <!-- Calendar Grid -->
+        <div class="glass-panel rounded-xl shadow-lg flex-1 overflow-hidden flex flex-col">
+            <!-- Day Headers -->
+            <div class="grid grid-cols-8 border-b border-gray-700 text-center text-xs uppercase tracking-widest text-gray-400 font-semibold">
+                <div class="p-3 border-r border-gray-700 bg-slate-900/60"></div>
+                <div id="cal-hdr-0" class="p-3 border-r border-gray-700">Mon</div>
+                <div id="cal-hdr-1" class="p-3 border-r border-gray-700">Tue</div>
+                <div id="cal-hdr-2" class="p-3 border-r border-gray-700">Wed</div>
+                <div id="cal-hdr-3" class="p-3 border-r border-gray-700">Thu</div>
+                <div id="cal-hdr-4" class="p-3 border-r border-gray-700">Fri</div>
+                <div id="cal-hdr-5" class="p-3 border-r border-gray-700">Sat</div>
+                <div id="cal-hdr-6" class="p-3">Sun</div>
+            </div>
+            <!-- Time Slots -->
+            <div id="calendar-grid-body" class="flex-1 overflow-y-auto">
+                <!-- Rendered by JS -->
+            </div>
+        </div>
+    </main>
+
     <script>
         let chartInstance = null;
+        let calendarWeekOffset = 0;
 
         function switchTab(tab) {
             const panels = {
                 dashboard: document.getElementById('panel-dashboard'),
                 outbound: document.getElementById('panel-outbound'),
                 crm: document.getElementById('panel-crm'),
-                webhooks: document.getElementById('panel-webhooks')
+                webhooks: document.getElementById('panel-webhooks'),
+                calendar: document.getElementById('panel-calendar')
             };
             const navs = {
                 dashboard: document.getElementById('nav-dashboard'),
                 outbound: document.getElementById('nav-outbound'),
                 crm: document.getElementById('nav-crm'),
-                webhooks: document.getElementById('nav-webhooks')
+                webhooks: document.getElementById('nav-webhooks'),
+                calendar: document.getElementById('nav-calendar')
             };
 
             Object.keys(panels).forEach(k => {
@@ -289,6 +324,9 @@
 
             if (tab === 'dashboard' || tab === 'crm') {
                 fetchData();
+            }
+            if (tab === 'calendar') {
+                renderCalendar();
             }
         }
 
@@ -571,6 +609,112 @@
         // Init
         fetchData();
         setInterval(fetchData, 10000); // Poll every 10s
+
+        // ─── Calendar Logic ───
+        function getWeekDates(offset) {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+            const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() + mondayOffset + (offset * 7));
+            monday.setHours(0,0,0,0);
+            const days = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                days.push(d);
+            }
+            return days;
+        }
+
+        function formatDateDDMMYYYY(d) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        }
+
+        function calendarPrevWeek() { calendarWeekOffset--; renderCalendar(); }
+        function calendarNextWeek() { calendarWeekOffset++; renderCalendar(); }
+        function calendarToday() { calendarWeekOffset = 0; renderCalendar(); }
+
+        async function renderCalendar() {
+            const days = getWeekDates(calendarWeekOffset);
+            const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const today = new Date(); today.setHours(0,0,0,0);
+
+            // Update headers
+            for (let i = 0; i < 7; i++) {
+                const hdr = document.getElementById(`cal-hdr-${i}`);
+                const d = days[i];
+                const isToday = d.getTime() === today.getTime();
+                hdr.innerHTML = `<div class="${isToday ? 'text-blue-400 font-bold' : ''}">${dayNames[i]}</div><div class="text-[10px] ${isToday ? 'bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mx-auto mt-1' : 'text-gray-500 mt-1'}">${d.getDate()}</div>`;
+            }
+
+            // Update week label
+            const label = document.getElementById('calendar-week-label');
+            label.innerText = `${monthNames[days[0].getMonth()]} ${days[0].getDate()} – ${monthNames[days[6].getMonth()]} ${days[6].getDate()}, ${days[6].getFullYear()}`;
+
+            // Fetch bookings
+            let bookings = [];
+            try {
+                const res = await fetch('/api/bookings');
+                bookings = await res.json();
+            } catch(e) { console.error(e); }
+
+            // Build a map: "DD/MM/YYYY" -> [{booking}, ...]
+            const bookingMap = {};
+            bookings.forEach(b => {
+                if (!bookingMap[b.date]) bookingMap[b.date] = [];
+                bookingMap[b.date].push(b);
+            });
+
+            // Render time rows (8 AM to 8 PM)
+            const body = document.getElementById('calendar-grid-body');
+            body.innerHTML = '';
+            for (let hour = 8; hour <= 20; hour++) {
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-8 border-b border-gray-800 min-h-[60px]';
+
+                // Time label
+                const timeLabel = document.createElement('div');
+                const h12 = hour > 12 ? hour - 12 : hour;
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                timeLabel.className = 'p-2 text-[10px] text-gray-500 border-r border-gray-800 flex items-start justify-end pr-3 bg-slate-900/40';
+                timeLabel.innerText = `${h12} ${ampm}`;
+                row.appendChild(timeLabel);
+
+                // Day cells
+                for (let d = 0; d < 7; d++) {
+                    const cell = document.createElement('div');
+                    const isToday = days[d].getTime() === today.getTime();
+                    cell.className = `border-r border-gray-800 p-1 relative ${isToday ? 'bg-blue-900/10' : ''} ${d === 6 ? 'border-r-0' : ''}`;
+
+                    const dateKey = formatDateDDMMYYYY(days[d]);
+                    const dayBookings = bookingMap[dateKey] || [];
+
+                    dayBookings.forEach(b => {
+                        // Parse booking time
+                        const [bHour] = b.time.split(':').map(Number);
+                        if (bHour === hour) {
+                            const card = document.createElement('div');
+                            const isVisit = b.booking_type === 'site_visit';
+                            card.className = `rounded p-2 text-[10px] leading-tight cursor-pointer transition hover:scale-[1.02] ${isVisit ? 'bg-green-600/30 border border-green-500/40 text-green-300' : 'bg-blue-600/30 border border-blue-500/40 text-blue-300'}`;
+                            card.innerHTML = `
+                                <div class="font-bold text-xs">${b.username}</div>
+                                <div class="mt-0.5">${isVisit ? '🏠 Site Visit' : '📞 Agent Call'} · ${h12}:${b.time.split(':')[1]} ${ampm}</div>
+                                ${b.gist ? `<div class="mt-1 text-[9px] text-gray-400 truncate" title="${b.gist}">${b.gist.substring(0, 60)}...</div>` : ''}
+                            `;
+                            cell.appendChild(card);
+                        }
+                    });
+
+                    row.appendChild(cell);
+                }
+                body.appendChild(row);
+            }
+        }
     </script>
 </body>
 </html>
