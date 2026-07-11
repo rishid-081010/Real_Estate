@@ -32,8 +32,8 @@ class LeadFormRequest(BaseModel):
 
 # Helper for sending WhatsApp message via Meta Cloud API
 def send_whatsapp_message(to_phone: str, text: str):
-    token = os.environ.get("WHATSAPP_ACCESS_TOKEN")
-    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+    token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAWVNxWTcTABR9AJ6vQQmpXOrHOcTFKFKF56f7VVcPZASdJnIB5BRs4Xb0dxF7JOgrx2v2a5cvZAinYSFZCkgZB2DZCqZB1eLka1CzJapN6wDyBQTGBUMKBKgAEqHQ3brtlPK5NljQwoJphsfMOF46eaE2ZBSFmPZCeirZBBW0nB07ZCJdlINmZCaU47OSZAmpcMOQJLzbdmkuJtJLjDCiwQPQAQPeVPxveQS6j0RHfzRLgbfcQi7Ticv9NSihjZBlWWCxYuUfwH6qiROqXjpRsMZBQl5e3gZDZD"
+    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or "1062362513617053"
     
     if not token or not phone_number_id:
         print("[WhatsApp Mock] No credentials. Would send message to", to_phone, ":", text)
