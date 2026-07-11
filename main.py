@@ -194,8 +194,8 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
         return {"status": "success", "event": "call_ended", "disposition": disposition}
 
     # CASE B: Custom Function Call from Voice Agent (mid-call or end-call extraction)
-    elif "function_arguments" in body:
-        args = body.get("function_arguments", {})
+    elif "args" in body or "function_arguments" in body:
+        args = body.get("args") or body.get("function_arguments", {})
         username = args.get("username")
         phone = args.get("phone")
         
