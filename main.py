@@ -196,14 +196,27 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
     # CASE B: Custom Function Call from Voice Agent (mid-call or end-call extraction)
     elif "function_arguments" in body:
         args = body.get("function_arguments", {})
+        username = args.get("username")
         phone = args.get("phone")
-        if not phone:
-            return {"status": "error", "message": "Phone number required"}
-
-        # Find or create lead
-        statement = select(Lead).where(Lead.phone == phone)
-        lead = db.exec(statement).first()
+        
+        lead = None
+        
+        # 1. Try to find lead by username (Format: Name_ID, e.g. "Rishi_1")
+        if username and "_" in username:
+            try:
+                lead_id = int(username.split("_")[-1])
+                lead = db.exec(select(Lead).where(Lead.id == lead_id)).first()
+            except ValueError:
+                pass
+                
+        # 2. Fallback to phone number if username lookup failed or was missing
+        if not lead and phone:
+            lead = db.exec(select(Lead).where(Lead.phone == phone)).first()
+            
+        # 3. Create new lead if still not found
         if not lead:
+            if not phone:
+                return {"status": "error", "message": "Phone number required to create a new lead"}
             lead = Lead(phone=phone, channel="voice", status="fresh_leads")
             db.add(lead)
             db.commit()
