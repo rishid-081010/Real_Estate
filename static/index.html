@@ -503,19 +503,30 @@
                 webhookContainer.innerHTML = '';
                 webhooks.forEach(wh => {
                     const div = document.createElement('div');
-                    div.className = 'border-b border-gray-800 pb-3';
+                    div.className = 'border-b border-gray-800 pb-2 mb-2';
                     const timeStr = new Date(wh.created_at).toLocaleString();
                     
                     let formattedJson = "{}";
+                    let summaryText = "Webhook Received";
                     try {
-                        formattedJson = JSON.stringify(JSON.parse(wh.payload), null, 2);
+                        const parsedObj = JSON.parse(wh.payload);
+                        formattedJson = JSON.stringify(parsedObj, null, 2);
+                        if (parsedObj.event) {
+                            summaryText = `Event: ${parsedObj.event}`;
+                        } else if (parsedObj.function_arguments) {
+                            summaryText = `Tool Invocation`;
+                        }
                     } catch(e) {
                         formattedJson = wh.payload;
                     }
                     
+                    const uniqueId = 'log-' + wh.id;
                     div.innerHTML = `
-                        <div class="text-gray-500 text-xs mb-1">[${timeStr}] Webhook Received</div>
-                        <pre class="bg-gray-900 p-3 rounded text-[11px] overflow-x-auto text-blue-300">${formattedJson}</pre>
+                        <div class="flex justify-between items-center cursor-pointer hover:bg-gray-800 p-2 rounded transition" onclick="document.getElementById('${uniqueId}').classList.toggle('hidden')">
+                            <span class="text-gray-400 font-semibold text-xs">[${timeStr}] <span class="text-blue-400 ml-2">${summaryText}</span></span>
+                            <span class="text-gray-500 text-xs">▼</span>
+                        </div>
+                        <pre id="${uniqueId}" class="bg-gray-900 p-3 rounded text-[11px] overflow-x-auto text-blue-300 hidden mt-2">${formattedJson}</pre>
                     `;
                     webhookContainer.appendChild(div);
                 });
