@@ -215,9 +215,11 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
             
         # 3. Create new lead if still not found
         if not lead:
-            if not phone:
-                return {"status": "error", "message": "Phone number required to create a new lead"}
-            lead = Lead(phone=phone, channel="voice", status="fresh_leads")
+            if not phone and not username:
+                return {"status": "error", "message": "Phone number or username required to create a new lead"}
+            
+            # Use 'Unknown' for phone if only username is provided
+            lead = Lead(phone=phone or "Unknown", name=username or "Unknown User", username=username, channel="voice", status="fresh_leads")
             db.add(lead)
             db.commit()
             db.refresh(lead)
