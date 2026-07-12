@@ -31,12 +31,19 @@ class LeadFormRequest(BaseModel):
     source: Optional[str] = "form"
 
 # Helper for sending WhatsApp message via Meta Cloud API
+import re
+
+def sanitize_phone(phone: str) -> str:
+    # Remove everything except digits
+    return re.sub(r'\D', '', phone)
+
 def send_whatsapp_message(to_phone: str, text: str):
     token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAOih8fSxwIBR7l0jQ3X8bbnPekVHrr3GkcqHkmo5ZBFo7PY8ZCi1G3aOAa1HL7M7yZCG9MOW8M0yV98OBgUVqHMJI72JwWbdlsydLfJFJobZCVdT8wo3ACJbUx1R2xpRZA09xfgKXrsTQfb3RZBfQZATIyRmNTEGUD3lddMZATGfIrsS0m4N9JuPotNBYIjbPVUpC7v2IcnAcyhIZA6mabT75UUwOuckd4ZB7vIZCoeArTFr3MEzQliRCPD47c1AFPpdZB7dGOS7ZCQlqdBNZBfaRIlqBh3MyHAZDZD"
     phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or "1062362513617053"
     
+    clean_phone = sanitize_phone(to_phone)
     if not token or not phone_number_id:
-        print("[WhatsApp Mock] No credentials. Would send message to", to_phone, ":", text)
+        print("[WhatsApp Mock] No credentials. Would send message to", clean_phone, ":", text)
         return False
         
     url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
@@ -47,7 +54,7 @@ def send_whatsapp_message(to_phone: str, text: str):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": to_phone,
+        "to": clean_phone,
         "type": "text",
         "text": {
             "body": text
@@ -66,6 +73,7 @@ def send_whatsapp_template(to_phone: str, template_name: str = "hello_world"):
     token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAOih8fSxwIBR7l0jQ3X8bbnPekVHrr3GkcqHkmo5ZBFo7PY8ZCi1G3aOAa1HL7M7yZCG9MOW8M0yV98OBgUVqHMJI72JwWbdlsydLfJFJobZCVdT8wo3ACJbUx1R2xpRZA09xfgKXrsTQfb3RZBfQZATIyRmNTEGUD3lddMZATGfIrsS0m4N9JuPotNBYIjbPVUpC7v2IcnAcyhIZA6mabT75UUwOuckd4ZB7vIZCoeArTFr3MEzQliRCPD47c1AFPpdZB7dGOS7ZCQlqdBNZBfaRIlqBh3MyHAZDZD"
     phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or "1062362513617053"
     
+    clean_phone = sanitize_phone(to_phone)
     if not token or not phone_number_id:
         return False
         
@@ -76,7 +84,7 @@ def send_whatsapp_template(to_phone: str, template_name: str = "hello_world"):
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": to_phone,
+        "to": clean_phone,
         "type": "template",
         "template": {
             "name": template_name,
