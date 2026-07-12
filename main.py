@@ -224,7 +224,20 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
             db.commit()
             db.refresh(lead)
 
-        # Update extracted data
+        function_name = body.get("name")
+        if function_name == "not_answered":
+            lead.status = "no_answer"
+            db.add(lead)
+            db.commit()
+            
+            # MANDATORY FALLBACK: Auto trigger WhatsApp outreach
+            fallback_text = (
+                f"Hi {lead.name or 'there'}, we tried calling you regarding your property inquiry on {lead.source or 'Property Finder'}. "
+                "Since we couldn't reach you, feel free to text us here to find the perfect property!"
+            )
+            send_whatsapp_message(lead.phone, fallback_text)
+            return {"status": "success", "event": "not_answered"}
+
         # Update extracted data
         if args.get("budget"): lead.budget = args.get("budget")
         if args.get("timeline"): lead.timeline = args.get("timeline")
