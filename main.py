@@ -62,7 +62,108 @@ def send_whatsapp_message(to_phone: str, text: str):
         print("[WhatsApp API] Error:", str(e))
         return False
 
+def send_whatsapp_template(to_phone: str, template_name: str = "hello_world"):
+    token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAWVNxWTcTABR9AJ6vQQmpXOrHOcTFKFKF56f7VVcPZASdJnIB5BRs4Xb0dxF7JOgrx2v2a5cvZAinYSFZCkgZB2DZCqZB1eLka1CzJapN6wDyBQTGBUMKBKgAEqHQ3brtlPK5NljQwoJphsfMOF46eaE2ZBSFmPZCeirZBBW0nB07ZCJdlINmZCaU47OSZAmpcMOQJLzbdmkuJtJLjDCiwQPQAQPeVPxveQS6j0RHfzRLgbfcQi7Ticv9NSihjZBlWWCxYuUfwH6qiROqXjpRsMZBQl5e3gZDZD"
+    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or "1062362513617053"
+    
+    if not token or not phone_number_id:
+        return False
+        
+    url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_phone,
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": { "code": "en_US" }
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print("[WhatsApp Template API] Status:", response.status_code, response.text)
+        return response.status_code == 200
+    except Exception as e:
+        print("[WhatsApp Template API] Error:", str(e))
+        return False
+
 # --- Webhook endpoints ---
+
+# 1. Meta Webhook Verification
+@app.get("/webhook/whatsapp")
+def verify_whatsapp_webhook(request: Request):
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+
+    if mode and token:
+        if mode == "subscribe" and token == "asquared_whatsapp_secret":
+            return int(challenge)
+        return {"error": "Invalid token"}, 403
+    return {"status": "ok"}
+
+# 2. Receive Incoming WhatsApp Messages
+@app.post("/webhook/whatsapp")
+async def receive_whatsapp_message(request: Request, db: Session = Depends(get_session)):
+    body = await request.json()
+    db.add(WebhookLog(payload=json.dumps(body)))
+    db.commit()
+
+    if body.get("object"):
+        for entry in body.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                if "messages" in value:
+                    for msg in value["messages"]:
+                        sender_phone = msg.get("from")
+                        text_body = msg.get("text", {}).get("body")
+                        
+                        if text_body and sender_phone:
+                            # 1. Find or create lead
+                            lead = db.exec(select(Lead).where(Lead.phone == sender_phone)).first()
+                            if not lead:
+                                lead = Lead(phone=sender_phone, name="WhatsApp User", channel="whatsapp", status="in_progress")
+                                db.add(lead)
+                                db.commit()
+                                db.refresh(lead)
+
+                            # 2. Save user message
+                            user_msg = Message(lead_id=lead.id, role="user", content=text_body, channel="whatsapp")
+                            db.add(user_msg)
+                            db.commit()
+
+                            # 3. Fetch chat history
+                            history = db.exec(select(Message).where(Message.lead_id == lead.id).order_by(Message.created_at)).all()
+                            chat_history = [{"role": m.role, "content": m.content} for m in history]
+
+                            # 4. Generate Gemini response
+                            from qualification import generate_whatsapp_response
+                            try:
+                                qual_data = generate_whatsapp_response(chat_history)
+                                
+                                # Update CRM fields if found
+                                if qual_data.status: lead.status = "qualified" if "Hot" in qual_data.status else lead.status
+                                if qual_data.gist: lead.handoff_note = qual_data.gist
+                                db.add(lead)
+                                
+                                # Save assistant message
+                                asst_msg = Message(lead_id=lead.id, role="assistant", content=qual_data.reply, channel="whatsapp")
+                                db.add(asst_msg)
+                                db.commit()
+                                
+                                # 5. Send reply via Meta API
+                                send_whatsapp_message(sender_phone, qual_data.reply)
+                                
+                            except Exception as e:
+                                print("[Gemini Error]", str(e))
+                                
+        return {"status": "ok"}
+    return {"status": "error", "message": "Invalid payload"}
 
 @app.post("/chat/test")
 def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
@@ -179,11 +280,8 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
             db.commit()
             
             # MANDATORY FALLBACK: Auto trigger WhatsApp outreach
-            fallback_text = (
-                f"Hi {lead.name or 'there'}, we tried calling you regarding your property inquiry on {lead.source or 'Property Finder'}. "
-                "Since we couldn't reach you, feel free to text us here to find the perfect property!"
-            )
-            send_whatsapp_message(lead.phone, fallback_text)
+            # Meta Sandbox requires the FIRST message to be a template like "hello_world"
+            send_whatsapp_template(lead.phone, "hello_world")
             
         elif lead.status == "fresh_leads" or lead.status == "assigned_leads":
             # If they picked up but we haven't qualified them yet
@@ -231,11 +329,8 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
             db.commit()
             
             # MANDATORY FALLBACK: Auto trigger WhatsApp outreach
-            fallback_text = (
-                f"Hi {lead.name or 'there'}, we tried calling you regarding your property inquiry on {lead.source or 'Property Finder'}. "
-                "Since we couldn't reach you, feel free to text us here to find the perfect property!"
-            )
-            send_whatsapp_message(lead.phone, fallback_text)
+            # Meta Sandbox requires the FIRST message to be a template like "hello_world"
+            send_whatsapp_template(lead.phone, "hello_world")
             return {"status": "success", "event": "not_answered"}
 
         # Update extracted data
