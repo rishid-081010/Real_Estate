@@ -78,6 +78,51 @@ def generate_qualification_response(chat_history: List[dict]) -> QualificationDa
     data = json.loads(response.text)
     return QualificationData(**data)
 
+def load_whatsapp_system_prompt():
+    try:
+        with open("whatsapp_system_prompt.md", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        # Fallback to a hardcoded minimal version if file isn't created yet
+        return "You are an AI Real Estate Agent for Asquared Real Estate. Qualify the user."
+
+class WhatsAppQualificationData(BaseModel):
+    gist: Optional[str] = Field(None, description="2-3 line summary of answers. Null if conversation is ongoing.")
+    status: Optional[str] = Field(None, description="Options: 'Hot / Qualified' if booked, else Null.")
+    date: Optional[str] = Field(None, description="DD/MM/YYYY format if booked. Null if not.")
+    time: Optional[str] = Field(None, description="HH:MM format if booked. Null if not.")
+    reply: str = Field(description="The response to say to the user.")
+
+def generate_whatsapp_response(chat_history: List[dict]) -> WhatsAppQualificationData:
+    """
+    chat_history: list of dicts with 'role' ('user' or 'model') and 'content'
+    """
+    client = get_client()
+    system_prompt = load_whatsapp_system_prompt()
+    
+    model = "gemini-2.5-flash"
+    
+    contents = []
+    for msg in chat_history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+
+    config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        response_mime_type="application/json",
+        response_schema=WhatsAppQualificationData,
+        temperature=0.3
+    )
+
+    response = client.models.generate_content(
+        model=model,
+        contents=contents,
+        config=config,
+    )
+    
+    data = json.loads(response.text)
+    return WhatsAppQualificationData(**data)
+
 def calculate_score(budget, timeline, property_type, location_pref) -> int:
     score = 0
     if budget: score += 30
