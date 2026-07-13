@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asquared Real Estate - WhatsApp Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .message-bubble {
+            max-width: 75%;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="flex h-screen items-center justify-center p-4">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="glass-panel p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+        <h1 class="text-2xl font-bold text-blue-400 mb-6">WhatsApp Simulator</h1>
+        <p class="text-gray-400 mb-4 text-sm">Enter the lead's exact username (e.g. <code>Rishi_1</code>) to load their chat session.</p>
+        <input type="text" id="username-input" class="w-full bg-gray-800 border border-gray-600 rounded p-3 text-white mb-4 focus:outline-none focus:border-blue-500" placeholder="Username">
+        <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded transition">Load Chat</button>
+        <p id="login-error" class="text-red-400 mt-4 text-sm hidden"></p>
+    </div>
+
+    <!-- Chat Interface -->
+    <div id="chat-screen" class="glass-panel flex flex-col hidden w-full max-w-2xl h-[90vh] rounded-xl shadow-2xl overflow-hidden border border-gray-700">
+        <!-- Header -->
+        <header class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold">A</div>
+                <div>
+                    <h2 class="font-semibold text-lg">Alex (Asquared AI)</h2>
+                    <p id="lead-status-label" class="text-xs text-green-400">Status: Loading...</p>
+                </div>
+            </div>
+            <button onclick="logout()" class="text-gray-400 hover:text-white text-sm">Change User</button>
+        </header>
+
+        <!-- Messages Area -->
+        <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0b141a]">
+            <!-- Messages injected here -->
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-gray-800 p-4 border-t border-gray-700 flex space-x-2">
+            <input type="text" id="message-input" class="flex-1 bg-gray-700 border border-gray-600 rounded-full px-4 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()" id="send-btn" class="bg-blue-600 hover:bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = "";
+
+        async function login() {
+            const username = document.getElementById("username-input").value.trim();
+            if (!username) return;
+            
+            document.getElementById("login-error").classList.add("hidden");
+            
+            try {
+                const res = await fetch(`/api/chat/simulator/history?username=${encodeURIComponent(username)}`);
+                const data = await res.json();
+                
+                if (data.status === "error") {
+                    document.getElementById("login-error").innerText = data.message;
+                    document.getElementById("login-error").classList.remove("hidden");
+                    return;
+                }
+                
+                currentUser = username;
+                document.getElementById("login-screen").classList.add("hidden");
+                document.getElementById("chat-screen").classList.remove("hidden");
+                document.getElementById("lead-status-label").innerText = `Lead Status: ${data.lead_status}`;
+                
+                renderMessages(data.history);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function logout() {
+            currentUser = "";
+            document.getElementById("chat-screen").classList.add("hidden");
+            document.getElementById("login-screen").classList.remove("hidden");
+            document.getElementById("username-input").value = "";
+        }
+
+        function renderMessages(history) {
+            const container = document.getElementById("messages-container");
+            container.innerHTML = "";
+            
+            if(history.length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-500 text-sm mt-10">No messages yet.</div>`;
+                return;
+            }
+
+            history.forEach(msg => {
+                appendMessage(msg.role, msg.content);
+            });
+            scrollToBottom();
+        }
+
+        function appendMessage(role, content) {
+            const container = document.getElementById("messages-container");
+            const isUser = role === "user";
+            
+            // Remove 'no messages' text if exists
+            if (container.innerHTML.includes("No messages yet.")) {
+                container.innerHTML = "";
+            }
+
+            const wrapper = document.createElement("div");
+            wrapper.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement("div");
+            bubble.className = `message-bubble p-3 rounded-lg text-sm ${isUser ? 'bg-blue-600 rounded-tr-none' : 'bg-gray-700 rounded-tl-none'}`;
+            bubble.innerText = content;
+            
+            wrapper.appendChild(bubble);
+            container.appendChild(wrapper);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById("messages-container");
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === "Enter") {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("message-input");
+            const content = input.value.trim();
+            if (!content || !currentUser) return;
+            
+            input.value = "";
+            input.disabled = true;
+            document.getElementById("send-btn").disabled = true;
+            
+            // Show user message instantly
+            appendMessage("user", content);
+            
+            // Add typing indicator
+            const typingId = "typing-" + Date.now();
+            const container = document.getElementById("messages-container");
+            const wrapper = document.createElement("div");
+            wrapper.id = typingId;
+            wrapper.className = `flex justify-start`;
+            wrapper.innerHTML = `<div class="message-bubble p-3 rounded-lg text-sm bg-gray-700 rounded-tl-none italic text-gray-400">Alex is typing...</div>`;
+            container.appendChild(wrapper);
+            scrollToBottom();
+
+            try {
+                const res = await fetch("/api/chat/simulator/send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: currentUser, message: content })
+                });
+                
+                const data = await res.json();
+                document.getElementById(typingId).remove();
+                
+                if (data.status === "success") {
+                    appendMessage("assistant", data.reply);
+                } else {
+                    appendMessage("assistant", "[Error] " + data.message);
+                }
+                
+                // Refresh status label
+                fetch(`/api/chat/simulator/history?username=${encodeURIComponent(currentUser)}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        document.getElementById("lead-status-label").innerText = `Lead Status: ${d.lead_status}`;
+                    });
+                    
+            } catch (e) {
+                console.error(e);
+                document.getElementById(typingId).remove();
+                appendMessage("assistant", "[Connection Error]");
+            }
+            
+            input.disabled = false;
+            document.getElementById("send-btn").disabled = false;
+            input.focus();
+        }
+    </script>
+</body>
+</html>

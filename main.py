@@ -187,6 +187,82 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
         return {"status": "ok"}
     return {"status": "error", "message": "Invalid payload"}
 
+@app.get("/chat")
+def serve_chat_ui():
+    return FileResponse("static/chat.html")
+
+@app.get("/api/chat/simulator/history")
+def get_simulator_history(username: str, db: Session = Depends(get_session)):
+    lead = db.exec(select(Lead).where(Lead.username == username)).first()
+    if not lead:
+        return {"status": "error", "message": "User not found"}
+        
+    history = db.exec(select(Message).where(Message.lead_id == lead.id).order_by(Message.created_at)).all()
+    chat_history = [{"role": m.role, "content": m.content, "timestamp": m.created_at.isoformat() if m.created_at else None} for m in history]
+    
+    # Simulate the "Hello World" fallback if they are in no_answer and have no history
+    if lead.status == "no_answer" and len(chat_history) == 0:
+        fallback_text = f"Hi {lead.name or 'there'}, we tried calling you regarding your property inquiry. Since we couldn't reach you, feel free to text us here to find the perfect property!"
+        asst_msg = Message(lead_id=lead.id, role="assistant", content=fallback_text, channel="simulator")
+        db.add(asst_msg)
+        db.commit()
+        db.refresh(asst_msg)
+        chat_history.append({"role": "assistant", "content": fallback_text, "timestamp": asst_msg.created_at.isoformat() if asst_msg.created_at else None})
+        
+    return {"status": "success", "history": chat_history, "lead_status": lead.status}
+
+class SimulatorRequest(BaseModel):
+    username: str
+    message: str
+
+@app.post("/api/chat/simulator/send")
+def send_simulator_message(req: SimulatorRequest, db: Session = Depends(get_session)):
+    lead = db.exec(select(Lead).where(Lead.username == req.username)).first()
+    if not lead:
+        return {"status": "error", "message": "User not found"}
+
+    # Auto-shift to in_progress if they were previously unengaged
+    if lead.status in ["no_answer", "fresh_leads", "assigned_leads"]:
+        lead.status = "in_progress"
+        db.add(lead)
+        db.commit()
+
+    # Save user message
+    user_msg = Message(lead_id=lead.id, role="user", content=req.message, channel="simulator")
+    db.add(user_msg)
+    db.commit()
+
+    # Fetch chat history
+    history = db.exec(select(Message).where(Message.lead_id == lead.id).order_by(Message.created_at)).all()
+    chat_history = [{"role": m.role, "content": m.content} for m in history]
+
+    # Generate Gemini response
+    from qualification import generate_whatsapp_response
+    try:
+        qual_data = generate_whatsapp_response(chat_history)
+        
+        # Update CRM fields based on new "change:" logic
+        if qual_data.status and qual_data.status.startswith("change:"):
+            new_status = qual_data.status.replace("change:", "").strip()
+            if "Hot" in new_status or "Qualified" in new_status:
+                lead.status = "qualified"
+            elif "Ready To Buy" in new_status:
+                lead.status = "ready_to_buy"
+        
+        if qual_data.gist and qual_data.gist.lower() != "null": 
+            lead.handoff_note = qual_data.gist
+            
+        db.add(lead)
+        
+        # Save assistant message
+        asst_msg = Message(lead_id=lead.id, role="assistant", content=qual_data.reply, channel="simulator")
+        db.add(asst_msg)
+        db.commit()
+        
+        return {"status": "success", "reply": qual_data.reply}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.post("/chat/test")
 def chat_test(req: ChatRequest, db: Session = Depends(get_session)):
     # Find or create lead
