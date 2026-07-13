@@ -191,11 +191,20 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
 def serve_chat_ui():
     return FileResponse("static/chat.html")
 
+def get_lead_by_username(username: str, db: Session):
+    if "_" in username:
+        try:
+            lead_id = int(username.split("_")[-1])
+            return db.exec(select(Lead).where(Lead.id == lead_id)).first()
+        except ValueError:
+            pass
+    return None
+
 @app.get("/api/chat/simulator/history")
 def get_simulator_history(username: str, db: Session = Depends(get_session)):
-    lead = db.exec(select(Lead).where(Lead.username == username)).first()
+    lead = get_lead_by_username(username, db)
     if not lead:
-        return {"status": "error", "message": "User not found"}
+        return {"status": "error", "message": "User not found. Try format like 'Name_1'"}
         
     history = db.exec(select(Message).where(Message.lead_id == lead.id).order_by(Message.created_at)).all()
     chat_history = [{"role": m.role, "content": m.content, "timestamp": m.created_at.isoformat() if m.created_at else None} for m in history]
@@ -217,7 +226,7 @@ class SimulatorRequest(BaseModel):
 
 @app.post("/api/chat/simulator/send")
 def send_simulator_message(req: SimulatorRequest, db: Session = Depends(get_session)):
-    lead = db.exec(select(Lead).where(Lead.username == req.username)).first()
+    lead = get_lead_by_username(req.username, db)
     if not lead:
         return {"status": "error", "message": "User not found"}
 
