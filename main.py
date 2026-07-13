@@ -137,8 +137,14 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
                             if not lead:
                                 lead = Lead(phone=sender_phone, name="WhatsApp User", channel="whatsapp", status="in_progress")
                                 db.add(lead)
-                                db.commit()
-                                db.refresh(lead)
+                            else:
+                                # Auto-shift to in_progress if they were previously unengaged
+                                if lead.status in ["no_answer", "fresh_leads", "assigned_leads"]:
+                                    lead.status = "in_progress"
+                                    db.add(lead)
+
+                            db.commit()
+                            db.refresh(lead)
 
                             # 2. Save user message
                             user_msg = Message(lead_id=lead.id, role="user", content=text_body, channel="whatsapp")
@@ -154,9 +160,17 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
                             try:
                                 qual_data = generate_whatsapp_response(chat_history)
                                 
-                                # Update CRM fields if found
-                                if qual_data.status: lead.status = "qualified" if "Hot" in qual_data.status else lead.status
-                                if qual_data.gist: lead.handoff_note = qual_data.gist
+                                # Update CRM fields based on new "change:" logic
+                                if qual_data.status and qual_data.status.startswith("change:"):
+                                    new_status = qual_data.status.replace("change:", "").strip()
+                                    if "Hot" in new_status or "Qualified" in new_status:
+                                        lead.status = "qualified"
+                                    elif "Ready To Buy" in new_status:
+                                        lead.status = "ready_to_buy"
+                                
+                                if qual_data.gist and qual_data.gist.lower() != "null": 
+                                    lead.handoff_note = qual_data.gist
+                                    
                                 db.add(lead)
                                 
                                 # Save assistant message
