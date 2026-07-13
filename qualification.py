@@ -88,7 +88,7 @@ def load_whatsapp_system_prompt():
 
 class WhatsAppQualificationData(BaseModel):
     gist: Optional[str] = Field(None, description="2-3 line summary of answers. Null if conversation is ongoing.")
-    status: Optional[str] = Field(None, description="Options: 'Hot / Qualified' if booked, else Null.")
+    status: Optional[str] = Field(None, description="Output 'same' if ongoing. Output 'change: Hot / Qualified' or 'change: Ready To Buy' if state changes.")
     date: Optional[str] = Field(None, description="DD/MM/YYYY format if booked. Null if not.")
     time: Optional[str] = Field(None, description="HH:MM format if booked. Null if not.")
     reply: str = Field(description="The response to say to the user.")
