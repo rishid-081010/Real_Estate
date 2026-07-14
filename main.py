@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
 import json
-from database import create_db_and_tables, get_session, Lead, Message, WebhookLog, Booking
+from database import create_db_and_tables, get_session, Lead, Message, WebhookLog, Booking, CallLog
 from qualification import generate_qualification_response, calculate_score
 
 @asynccontextmanager
@@ -430,6 +430,43 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
             db.add(lead)
             db.commit()
 
+        # Save call transcript
+        transcript_raw = call_info.get("transcript") or ""
+        transcript_obj = call_info.get("transcript_object") or []
+        call_duration = call_info.get("duration_ms")
+        call_summary = call_info.get("call_analysis", {}).get("call_summary") if call_info.get("call_analysis") else None
+        
+        # Build structured transcript from transcript_object if available
+        structured_transcript = []
+        if transcript_obj:
+            for turn in transcript_obj:
+                role = turn.get("role", "unknown")
+                content = turn.get("content", "")
+                structured_transcript.append({"role": role, "content": content})
+        elif transcript_raw:
+            # Fallback: parse the plain text transcript
+            lines = transcript_raw.strip().split("\n")
+            for line in lines:
+                if line.startswith("Agent:"):
+                    structured_transcript.append({"role": "agent", "content": line[6:].strip()})
+                elif line.startswith("User:"):
+                    structured_transcript.append({"role": "user", "content": line[5:].strip()})
+                else:
+                    structured_transcript.append({"role": "system", "content": line.strip()})
+        
+        call_log = CallLog(
+            lead_id=lead.id,
+            call_id=call_info.get("call_id"),
+            phone=phone,
+            lead_name=lead.name,
+            disposition=disposition,
+            duration_seconds=int(call_duration / 1000) if call_duration else None,
+            transcript=json.dumps(structured_transcript) if structured_transcript else None,
+            summary=call_summary
+        )
+        db.add(call_log)
+        db.commit()
+
         return {"status": "success", "event": "call_ended", "disposition": disposition}
 
     # CASE B: Custom Function Call from Voice Agent (mid-call or end-call extraction)
@@ -724,6 +761,25 @@ def get_webhook_logs(db: Session = Depends(get_session)):
 def get_bookings(db: Session = Depends(get_session)):
     bookings = db.exec(select(Booking).order_by(Booking.created_at.desc())).all()
     return bookings
+
+@app.get("/api/calls")
+def get_calls(db: Session = Depends(get_session)):
+    calls = db.exec(select(CallLog).order_by(CallLog.created_at.desc())).all()
+    result = []
+    for c in calls:
+        result.append({
+            "id": c.id,
+            "lead_id": c.lead_id,
+            "call_id": c.call_id,
+            "phone": c.phone,
+            "lead_name": c.lead_name,
+            "disposition": c.disposition,
+            "duration_seconds": c.duration_seconds,
+            "transcript": json.loads(c.transcript) if c.transcript else [],
+            "summary": c.summary,
+            "created_at": c.created_at.isoformat() if c.created_at else None
+        })
+    return result
 
 class ManualBookingRequest(BaseModel):
     username: str

@@ -45,6 +45,18 @@ class Booking(SQLModel, table=True):
     status: str = "confirmed"  # confirmed, completed, cancelled
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+class CallLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lead_id: Optional[int] = Field(default=None, foreign_key="lead.id")
+    call_id: Optional[str] = None
+    phone: Optional[str] = None
+    lead_name: Optional[str] = None
+    disposition: Optional[str] = None  # "answered", "no-answer", "busy", etc.
+    duration_seconds: Optional[int] = None
+    transcript: Optional[str] = None  # JSON string of [{role, content}, ...]
+    summary: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 # Use SQLite for now (Render Postgres can be swapped in later)
 sqlite_file_name = "database.sqlite"
 sqlite_url = f"sqlite:///{sqlite_file_name}"

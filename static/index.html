@@ -28,7 +28,7 @@
             <button onclick="switchTab('webhooks')" id="nav-webhooks" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Webhook Logs</button>
             <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calendar Bookings</button>
             <button onclick="switchTab('analytics')" id="nav-analytics" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Analytics</button>
-            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calls</button>
+            <button onclick="switchTab('calls')" id="nav-calls" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calls</button>
             <button onclick="switchTab('integrations')" id="nav-integrations" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Integrations</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Settings</button>
         </nav>
@@ -466,6 +466,37 @@
         </div>
     </main>
 
+    <!-- Main Content Panel (Calls) -->
+    <main id="panel-calls" class="flex-1 flex h-screen overflow-hidden hidden">
+        <!-- Call List Sidebar -->
+        <div class="w-80 border-r border-gray-700 bg-slate-900/60 flex flex-col">
+            <div class="p-4 border-b border-gray-700">
+                <h2 class="text-lg font-semibold">Call Recordings</h2>
+                <p class="text-xs text-gray-400 mt-1">Transcripts from Retell AI calls</p>
+            </div>
+            <div id="calls-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <div class="text-center text-gray-500 text-sm py-8">Loading calls...</div>
+            </div>
+        </div>
+        <!-- Transcript Viewer -->
+        <div class="flex-1 flex flex-col">
+            <div id="call-header" class="p-4 border-b border-gray-700 bg-slate-900/40">
+                <h3 class="text-lg font-semibold text-gray-300">Select a call to view the transcript</h3>
+                <p id="call-meta" class="text-xs text-gray-500 mt-1"></p>
+            </div>
+            <div id="call-transcript" class="flex-1 overflow-y-auto p-6 space-y-4">
+                <div class="flex items-center justify-center h-full text-gray-500">
+                    <p>Click a call from the left panel to view its transcript here</p>
+                </div>
+            </div>
+            <!-- Summary -->
+            <div id="call-summary-bar" class="border-t border-gray-700 p-4 bg-slate-900/40 hidden">
+                <h4 class="text-xs text-gray-400 uppercase tracking-wider mb-1">Call Summary</h4>
+                <p id="call-summary-text" class="text-sm text-gray-300"></p>
+            </div>
+        </div>
+    </main>
+
     <script>
         let chartInstance = null;
         let calendarWeekOffset = 0;
@@ -478,6 +509,7 @@
                 webhooks: document.getElementById('panel-webhooks'),
                 calendar: document.getElementById('panel-calendar'),
                 analytics: document.getElementById('panel-analytics'),
+                calls: document.getElementById('panel-calls'),
                 integrations: document.getElementById('panel-integrations')
             };
             const navs = {
@@ -487,6 +519,7 @@
                 webhooks: document.getElementById('nav-webhooks'),
                 calendar: document.getElementById('nav-calendar'),
                 analytics: document.getElementById('nav-analytics'),
+                calls: document.getElementById('nav-calls'),
                 integrations: document.getElementById('nav-integrations')
             };
 
@@ -508,6 +541,9 @@
             }
             if (tab === 'analytics') {
                 fetchAnalytics();
+            }
+            if (tab === 'calls') {
+                fetchCalls();
             }
         }
 
@@ -926,6 +962,103 @@
             } catch (err) {
                 console.error("Failed to fetch analytics", err);
             }
+        }
+
+        // ─── Calls Logic ───
+        let callsData = [];
+
+        async function fetchCalls() {
+            const listEl = document.getElementById('calls-list');
+            try {
+                const res = await fetch('/api/calls');
+                callsData = await res.json();
+                
+                if (callsData.length === 0) {
+                    listEl.innerHTML = '<div class="text-center text-gray-500 text-sm py-8">No call recordings yet.<br><span class="text-[10px]">Calls from Retell will appear here automatically.</span></div>';
+                    return;
+                }
+                
+                listEl.innerHTML = '';
+                callsData.forEach((call, idx) => {
+                    const dur = call.duration_seconds ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
+                    const date = call.created_at ? new Date(call.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+                    const time = call.created_at ? new Date(call.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    
+                    const dispColor = call.disposition === 'no-answer' || call.disposition === 'busy' || call.disposition === 'failed'
+                        ? 'text-red-400 bg-red-500/10 border-red-500/30'
+                        : 'text-green-400 bg-green-500/10 border-green-500/30';
+                    
+                    const card = document.createElement('div');
+                    card.className = 'p-3 rounded-lg bg-slate-800/60 border border-gray-700 hover:border-blue-500/50 cursor-pointer transition group';
+                    card.onclick = () => showTranscript(idx);
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="font-semibold text-sm text-slate-200 group-hover:text-blue-400 transition">${call.lead_name || 'Unknown'}</div>
+                            <span class="text-[9px] ${dispColor} px-1.5 py-0.5 rounded border font-medium">${(call.disposition || 'unknown').toUpperCase()}</span>
+                        </div>
+                        <div class="text-[10px] text-gray-400 mt-1 flex justify-between">
+                            <span>📞 ${call.phone || 'N/A'}</span>
+                            <span>⏱ ${dur}</span>
+                        </div>
+                        <div class="text-[9px] text-gray-500 mt-1">${date} ${time}</div>
+                        <div class="text-[10px] text-gray-400 mt-1">${call.transcript.length} messages</div>
+                    `;
+                    listEl.appendChild(card);
+                });
+            } catch(e) {
+                listEl.innerHTML = '<div class="text-center text-red-400 text-sm py-8">Failed to load calls</div>';
+                console.error(e);
+            }
+        }
+
+        function showTranscript(idx) {
+            const call = callsData[idx];
+            if (!call) return;
+            
+            // Update header
+            const dur = call.duration_seconds ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
+            const dateStr = call.created_at ? new Date(call.created_at).toLocaleString() : 'Unknown time';
+            document.querySelector('#call-header h3').innerText = `${call.lead_name || 'Unknown'} — ${call.phone || 'N/A'}`;
+            document.getElementById('call-meta').innerText = `${dateStr}  ·  Duration: ${dur}  ·  Disposition: ${(call.disposition || 'unknown').toUpperCase()}  ·  Call ID: ${call.call_id || 'N/A'}`;
+            
+            // Render transcript as chat bubbles
+            const container = document.getElementById('call-transcript');
+            container.innerHTML = '';
+            
+            if (!call.transcript || call.transcript.length === 0) {
+                container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><p>No transcript available for this call</p></div>';
+            } else {
+                call.transcript.forEach(turn => {
+                    const isAgent = turn.role === 'agent' || turn.role === 'assistant';
+                    const bubble = document.createElement('div');
+                    bubble.className = `flex ${isAgent ? 'justify-start' : 'justify-end'}`;
+                    
+                    const roleLabel = isAgent ? '🤖 Alex (AI Agent)' : '👤 Customer';
+                    const bubbleColor = isAgent
+                        ? 'bg-slate-700/80 border-slate-600 text-slate-200'
+                        : 'bg-blue-600/30 border-blue-500/40 text-blue-100';
+                    
+                    bubble.innerHTML = `
+                        <div class="max-w-[70%] ${bubbleColor} border rounded-xl px-4 py-3 shadow">
+                            <div class="text-[10px] font-bold ${isAgent ? 'text-green-400' : 'text-blue-400'} mb-1">${roleLabel}</div>
+                            <p class="text-sm leading-relaxed">${turn.content}</p>
+                        </div>
+                    `;
+                    container.appendChild(bubble);
+                });
+            }
+            
+            // Show summary bar
+            const summaryBar = document.getElementById('call-summary-bar');
+            if (call.summary) {
+                document.getElementById('call-summary-text').innerText = call.summary;
+                summaryBar.classList.remove('hidden');
+            } else {
+                summaryBar.classList.add('hidden');
+            }
+            
+            // Scroll to top
+            container.scrollTop = 0;
         }
 
         // ─── Calendar Logic ───
