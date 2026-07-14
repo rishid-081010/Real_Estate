@@ -473,6 +473,7 @@
             <div class="p-4 border-b border-gray-700">
                 <h2 class="text-lg font-semibold">Call Recordings</h2>
                 <p class="text-xs text-gray-400 mt-1">Transcripts from Retell AI calls</p>
+                <button onclick="backfillCalls()" class="mt-2 w-full px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition border border-gray-600">🔄 Sync from Webhook Logs</button>
             </div>
             <div id="calls-list" class="flex-1 overflow-y-auto p-2 space-y-2">
                 <div class="text-center text-gray-500 text-sm py-8">Loading calls...</div>
@@ -1059,6 +1060,26 @@
             
             // Scroll to top
             container.scrollTop = 0;
+        }
+
+        async function backfillCalls() {
+            const btn = document.querySelector('button[onclick="backfillCalls()"]');
+            const originalText = btn.innerText;
+            try {
+                btn.innerText = 'Syncing...';
+                btn.disabled = true;
+                const res = await fetch('/api/calls/backfill', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    btn.innerText = `Synced ${data.backfilled} calls!`;
+                    setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 3000);
+                    fetchCalls();
+                }
+            } catch(e) {
+                console.error(e);
+                btn.innerText = 'Error syncing';
+                setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 3000);
+            }
         }
 
         // ─── Calendar Logic ───
