@@ -606,6 +606,105 @@ def get_dashboard_stats(db: Session = Depends(get_session)):
         "meetings_booked": meetings_booked
     }
 
+@app.get("/api/analytics")
+def get_analytics(db: Session = Depends(get_session)):
+    from datetime import timedelta
+    
+    leads = db.exec(select(Lead)).all()
+    bookings = db.exec(select(Booking)).all()
+    messages = db.exec(select(Message)).all()
+    
+    total = len(leads)
+    
+    # Pipeline breakdown
+    pipeline = {
+        "Assigned Leads": 0,
+        "No Answer": 0,
+        "In Progress": 0,
+        "Hot / Qualified": 0,
+        "Ready To Buy": 0
+    }
+    status_map = {
+        "fresh_leads": "Assigned Leads",
+        "assigned_leads": "Assigned Leads",
+        "no_answer": "No Answer",
+        "in_progress": "In Progress",
+        "qualified": "Hot / Qualified",
+        "ready_to_buy": "Ready To Buy",
+        "new": "Assigned Leads"
+    }
+    
+    sources = {}
+    channels = {}
+    
+    for lead in leads:
+        bucket = status_map.get(lead.status, "Assigned Leads")
+        pipeline[bucket] += 1
+        
+        src = lead.source or "unknown"
+        sources[src] = sources.get(src, 0) + 1
+        
+        ch = lead.channel or "unknown"
+        channels[ch] = channels.get(ch, 0) + 1
+    
+    # Daily lead intake (last 14 days)
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    daily_leads = {}
+    for i in range(13, -1, -1):
+        day = today - timedelta(days=i)
+        day_str = day.strftime("%d %b")
+        daily_leads[day_str] = 0
+    
+    for lead in leads:
+        day_str = lead.created_at.strftime("%d %b")
+        if day_str in daily_leads:
+            daily_leads[day_str] += 1
+    
+    # Booking stats
+    total_bookings = len(bookings)
+    agent_calls = len([b for b in bookings if b.booking_type == "agent_call"])
+    site_visits = len([b for b in bookings if b.booking_type == "site_visit"])
+    
+    # Message stats
+    total_messages = len(messages)
+    user_messages = len([m for m in messages if m.role == "user"])
+    assistant_messages = len([m for m in messages if m.role == "assistant"])
+    
+    # Avg messages per lead
+    leads_with_msgs = len(set(m.lead_id for m in messages))
+    avg_msgs_per_lead = round(total_messages / leads_with_msgs, 1) if leads_with_msgs > 0 else 0
+    
+    # Qualification rate
+    qualified_count = pipeline["Hot / Qualified"] + pipeline["Ready To Buy"]
+    qualification_rate = round((qualified_count / total * 100) if total > 0 else 0, 1)
+    
+    # Response rate (leads that have at least 1 user message = they responded)
+    responded_leads = len(set(m.lead_id for m in messages if m.role == "user"))
+    response_rate = round((responded_leads / total * 100) if total > 0 else 0, 1)
+    
+    return {
+        "total_leads": total,
+        "pipeline": pipeline,
+        "sources": sources,
+        "channels": channels,
+        "daily_leads": daily_leads,
+        "bookings": {
+            "total": total_bookings,
+            "agent_calls": agent_calls,
+            "site_visits": site_visits
+        },
+        "messages": {
+            "total": total_messages,
+            "user": user_messages,
+            "assistant": assistant_messages,
+            "avg_per_lead": avg_msgs_per_lead
+        },
+        "rates": {
+            "qualification": qualification_rate,
+            "response": response_rate
+        }
+    }
+
 @app.get("/api/leads")
 def get_dashboard_leads(db: Session = Depends(get_session)):
     leads = db.exec(select(Lead).order_by(Lead.created_at.desc())).all()

@@ -27,7 +27,7 @@
             <button onclick="switchTab('crm')" id="nav-crm" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">CRM View</button>
             <button onclick="switchTab('webhooks')" id="nav-webhooks" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Webhook Logs</button>
             <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Calendar Bookings</button>
-            <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Analytics</button>
+            <button onclick="switchTab('analytics')" id="nav-analytics" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Analytics</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Calls</button>
             <button onclick="switchTab('integrations')" id="nav-integrations" class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition">Integrations</button>
             <button class="w-full text-left block px-4 py-2 rounded hover:bg-gray-800 text-gray-400 transition opacity-50 cursor-not-allowed" disabled>Settings</button>
@@ -363,6 +363,109 @@
         </div>
     </main>
 
+    <!-- Main Content Panel (Analytics) -->
+    <main id="panel-analytics" class="flex-1 flex flex-col h-screen overflow-y-auto p-8 space-y-6 hidden">
+        <header class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold">Analytics</h2>
+            <div class="flex items-center space-x-4">
+                <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/50">● Live Data</span>
+                <button onclick="fetchAnalytics()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-600 text-sm">Refresh</button>
+            </div>
+        </header>
+
+        <!-- KPI Cards Row -->
+        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
+            <div class="glass-panel p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Total Leads</p>
+                <p class="text-2xl font-bold" id="a-total-leads">0</p>
+            </div>
+            <div class="glass-panel p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Qualification Rate</p>
+                <p class="text-2xl font-bold text-green-400" id="a-qual-rate">0%</p>
+            </div>
+            <div class="glass-panel p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Response Rate</p>
+                <p class="text-2xl font-bold text-blue-400" id="a-resp-rate">0%</p>
+            </div>
+            <div class="glass-panel p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Meetings Booked</p>
+                <p class="text-2xl font-bold text-purple-400" id="a-total-bookings">0</p>
+            </div>
+            <div class="glass-panel p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Total Messages</p>
+                <p class="text-2xl font-bold text-yellow-400" id="a-total-msgs">0</p>
+            </div>
+            <div class="glass-panel p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Avg Msgs / Lead</p>
+                <p class="text-2xl font-bold text-cyan-400" id="a-avg-msgs">0</p>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Daily Lead Intake -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Daily Lead Intake (Last 14 Days)</h3>
+                <div class="relative h-64">
+                    <canvas id="chart-daily-leads"></canvas>
+                </div>
+            </div>
+            <!-- Pipeline Funnel -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Pipeline Funnel</h3>
+                <div class="relative h-64">
+                    <canvas id="chart-pipeline"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Lead Sources -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Lead Sources</h3>
+                <div class="relative h-56 flex justify-center">
+                    <canvas id="chart-sources"></canvas>
+                </div>
+            </div>
+            <!-- Channel Distribution -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Channel Distribution</h3>
+                <div class="relative h-56 flex justify-center">
+                    <canvas id="chart-channels"></canvas>
+                </div>
+            </div>
+            <!-- Booking Breakdown -->
+            <div class="glass-panel p-6 rounded-xl shadow-lg">
+                <h3 class="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Booking Types</h3>
+                <div class="relative h-56 flex justify-center">
+                    <canvas id="chart-bookings"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Message Stats -->
+        <div class="glass-panel p-6 rounded-xl shadow-lg">
+            <h3 class="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Message Activity</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <p class="text-4xl font-bold text-blue-400" id="a-user-msgs">0</p>
+                    <p class="text-xs text-gray-400 mt-1 uppercase tracking-wider">User Messages</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-4xl font-bold text-green-400" id="a-asst-msgs">0</p>
+                    <p class="text-xs text-gray-400 mt-1 uppercase tracking-wider">AI Responses</p>
+                </div>
+                <div class="text-center">
+                    <div class="relative w-32 h-32 mx-auto">
+                        <canvas id="chart-msg-ratio"></canvas>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 uppercase tracking-wider">Message Ratio</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
     <script>
         let chartInstance = null;
         let calendarWeekOffset = 0;
@@ -374,6 +477,7 @@
                 crm: document.getElementById('panel-crm'),
                 webhooks: document.getElementById('panel-webhooks'),
                 calendar: document.getElementById('panel-calendar'),
+                analytics: document.getElementById('panel-analytics'),
                 integrations: document.getElementById('panel-integrations')
             };
             const navs = {
@@ -382,6 +486,7 @@
                 crm: document.getElementById('nav-crm'),
                 webhooks: document.getElementById('nav-webhooks'),
                 calendar: document.getElementById('nav-calendar'),
+                analytics: document.getElementById('nav-analytics'),
                 integrations: document.getElementById('nav-integrations')
             };
 
@@ -400,6 +505,9 @@
             }
             if (tab === 'calendar') {
                 renderCalendar();
+            }
+            if (tab === 'analytics') {
+                fetchAnalytics();
             }
         }
 
@@ -682,6 +790,143 @@
         // Init
         fetchData();
         setInterval(fetchData, 10000); // Poll every 10s
+
+        // ─── Analytics Logic ───
+        let aCharts = {};
+
+        function destroyChart(key) {
+            if (aCharts[key]) { aCharts[key].destroy(); aCharts[key] = null; }
+        }
+
+        async function fetchAnalytics() {
+            try {
+                const res = await fetch('/api/analytics');
+                const data = await res.json();
+
+                // KPI Cards
+                document.getElementById('a-total-leads').innerText = data.total_leads;
+                document.getElementById('a-qual-rate').innerText = data.rates.qualification + '%';
+                document.getElementById('a-resp-rate').innerText = data.rates.response + '%';
+                document.getElementById('a-total-bookings').innerText = data.bookings.total;
+                document.getElementById('a-total-msgs').innerText = data.messages.total;
+                document.getElementById('a-avg-msgs').innerText = data.messages.avg_per_lead;
+                document.getElementById('a-user-msgs').innerText = data.messages.user;
+                document.getElementById('a-asst-msgs').innerText = data.messages.assistant;
+
+                const chartDefaults = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1', font: { family: 'Inter', size: 11 } } }
+                    }
+                };
+
+                // 1. Daily Lead Intake (Bar chart)
+                destroyChart('dailyLeads');
+                aCharts.dailyLeads = new Chart(document.getElementById('chart-daily-leads'), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(data.daily_leads),
+                        datasets: [{
+                            label: 'Leads',
+                            data: Object.values(data.daily_leads),
+                            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                            borderColor: '#3b82f6',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        ...chartDefaults,
+                        plugins: {
+                            ...chartDefaults.plugins,
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                            y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                        }
+                    }
+                });
+
+                // 2. Pipeline Funnel (Horizontal Bar)
+                const pipelineLabels = Object.keys(data.pipeline);
+                const pipelineColors = ['#3b82f6', '#ef4444', '#eab308', '#22c55e', '#a855f7'];
+                destroyChart('pipeline');
+                aCharts.pipeline = new Chart(document.getElementById('chart-pipeline'), {
+                    type: 'bar',
+                    data: {
+                        labels: pipelineLabels,
+                        datasets: [{
+                            label: 'Leads',
+                            data: Object.values(data.pipeline),
+                            backgroundColor: pipelineColors.map(c => c + '99'),
+                            borderColor: pipelineColors,
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        ...chartDefaults,
+                        indexAxis: 'y',
+                        plugins: { ...chartDefaults.plugins, legend: { display: false } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                            y: { ticks: { color: '#cbd5e1', font: { size: 11 } }, grid: { display: false } }
+                        }
+                    }
+                });
+
+                // 3. Sources (Doughnut)
+                const srcColors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#f43f5e'];
+                destroyChart('sources');
+                aCharts.sources = new Chart(document.getElementById('chart-sources'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(data.sources),
+                        datasets: [{ data: Object.values(data.sources), backgroundColor: srcColors, borderWidth: 0, hoverOffset: 4 }]
+                    },
+                    options: { ...chartDefaults, cutout: '65%', plugins: { ...chartDefaults.plugins, legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 10 }, padding: 12 } } } }
+                });
+
+                // 4. Channels (Doughnut)
+                const chColors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#3b82f6'];
+                destroyChart('channels');
+                aCharts.channels = new Chart(document.getElementById('chart-channels'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(data.channels),
+                        datasets: [{ data: Object.values(data.channels), backgroundColor: chColors, borderWidth: 0, hoverOffset: 4 }]
+                    },
+                    options: { ...chartDefaults, cutout: '65%', plugins: { ...chartDefaults.plugins, legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 10 }, padding: 12 } } } }
+                });
+
+                // 5. Booking Types (Doughnut)
+                destroyChart('bookings');
+                aCharts.bookings = new Chart(document.getElementById('chart-bookings'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Agent Calls', 'Site Visits'],
+                        datasets: [{ data: [data.bookings.agent_calls, data.bookings.site_visits], backgroundColor: ['#3b82f6', '#22c55e'], borderWidth: 0, hoverOffset: 4 }]
+                    },
+                    options: { ...chartDefaults, cutout: '65%', plugins: { ...chartDefaults.plugins, legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 10 }, padding: 12 } } } }
+                });
+
+                // 6. Message Ratio (Doughnut)
+                destroyChart('msgRatio');
+                aCharts.msgRatio = new Chart(document.getElementById('chart-msg-ratio'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['User', 'AI'],
+                        datasets: [{ data: [data.messages.user, data.messages.assistant], backgroundColor: ['#3b82f6', '#22c55e'], borderWidth: 0 }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { display: false } } }
+                });
+
+            } catch (err) {
+                console.error("Failed to fetch analytics", err);
+            }
+        }
 
         // ─── Calendar Logic ───
         function getWeekDates(offset) {
