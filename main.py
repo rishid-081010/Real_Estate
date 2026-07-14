@@ -51,7 +51,7 @@ def sanitize_phone(phone: str) -> str:
     return re.sub(r'\D', '', phone)
 
 def send_whatsapp_message(to_phone: str, text: str):
-    token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAOih8fSxwIBRZCPrXu1NrPxfM6T1hvBlZCIHFmQS7umApRUZCCnAzyiyAywBbFWl11HzM4CG6USwYvYgPlcdtTeKJgIWwbPKcQp9db66SHMRD0RyE4jLQ1zlOZAsnoEaABfzgykK2ekE0EAZBCcQZBBG3dDd8sTGgQ0B6qv7exsrVS6ZBu2st9JlkZA1jBc2j8Y3QAWt20NsK3OcCv42FqHJEwXBMIh3S27u8HUdGfZAcf0ufhw5W0juAK5kuH8fPRZA0TAXqSCwxMvAfbnO14rTw3j427A0ZD"
+    token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAOih8fSxwIBR8oDGqPNG1PsFd8LL0R95v0ua6lz7H6Mu8nPTWklwJwWX3966X3fOBwNmD0Pc5UjwakFNZBQZBBCmddHPCfsVEhvbq9sIQXsrKHW2y4LUjEsgV0LKKtQJQXX5jvQznfrvwZA5oDPBEqHjGf46aTH6LpyZBoIj2DpDmgWNHG8cuvAlEtf3r4Xjma4ZBZB9njQidLhiYKH0be25AKRlOHOhZBPxRbgNO1JQTNNlzpu1cD0gtK9CLbmWfRatUQwkhQWed7nK1QOHZAUDXVG"
     phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or "1237934332731206"
     
     clean_phone = sanitize_phone(to_phone)
@@ -98,7 +98,7 @@ def send_whatsapp_message(to_phone: str, text: str):
         return False
 
 def send_whatsapp_template(to_phone: str, template_name: str = "hello_world"):
-    token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAOih8fSxwIBRZCPrXu1NrPxfM6T1hvBlZCIHFmQS7umApRUZCCnAzyiyAywBbFWl11HzM4CG6USwYvYgPlcdtTeKJgIWwbPKcQp9db66SHMRD0RyE4jLQ1zlOZAsnoEaABfzgykK2ekE0EAZBCcQZBBG3dDd8sTGgQ0B6qv7exsrVS6ZBu2st9JlkZA1jBc2j8Y3QAWt20NsK3OcCv42FqHJEwXBMIh3S27u8HUdGfZAcf0ufhw5W0juAK5kuH8fPRZA0TAXqSCwxMvAfbnO14rTw3j427A0ZD"
+    token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or "EAAOih8fSxwIBR8oDGqPNG1PsFd8LL0R95v0ua6lz7H6Mu8nPTWklwJwWX3966X3fOBwNmD0Pc5UjwakFNZBQZBBCmddHPCfsVEhvbq9sIQXsrKHW2y4LUjEsgV0LKKtQJQXX5jvQznfrvwZA5oDPBEqHjGf46aTH6LpyZBoIj2DpDmgWNHG8cuvAlEtf3r4Xjma4ZBZB9njQidLhiYKH0be25AKRlOHOhZBPxRbgNO1JQTNNlzpu1cD0gtK9CLbmWfRatUQwkhQWed7nK1QOHZAUDXVG"
     phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or "1237934332731206"
     
     clean_phone = sanitize_phone(to_phone)
