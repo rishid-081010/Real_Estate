@@ -75,8 +75,23 @@ def send_whatsapp_message(to_phone: str, text: str):
     }
     
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        print("[WhatsApp API] Status:", response.status_code, response.text)
+        response = requests.post(url, headers=headers, json=payload)
+        print("[WhatsApp Response]", response.text)
+        
+        # Also log to database so it can be debugged remotely
+        from database import get_session, WebhookLog
+        import json
+        
+        # We create a new session just for this logging to avoid conflicts
+        try:
+            from sqlmodel import Session, create_engine
+            engine = create_engine("sqlite:///asquared.db")
+            with Session(engine) as session:
+                session.add(WebhookLog(payload=json.dumps({"meta_whatsapp_response": response.json()})))
+                session.commit()
+        except Exception as e:
+            pass
+            
         return response.status_code == 200
     except Exception as e:
         print("[WhatsApp API] Error:", str(e))
@@ -206,6 +221,10 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
                                 send_whatsapp_message(sender_phone, qual_data.reply)
                                 
                             except Exception as e:
+                                import traceback
+                                error_trace = traceback.format_exc()
+                                db.add(WebhookLog(payload=json.dumps({"error_in_gemini": str(e), "traceback": error_trace})))
+                                db.commit()
                                 print("[Gemini Error]", str(e))
                                 
         return {"status": "ok"}
