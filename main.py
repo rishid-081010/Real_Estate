@@ -183,6 +183,17 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
                                 if qual_data.gist and qual_data.gist.lower() != "null": 
                                     lead.handoff_note = qual_data.gist
                                     
+                                if qual_data.date and qual_data.date.lower() != "null" and qual_data.time and qual_data.time.lower() != "null":
+                                    booking = Booking(
+                                        lead_id=lead.id,
+                                        username=f"{lead.name or 'Unknown'}_{lead.id}",
+                                        booking_type="agent_call",
+                                        date=qual_data.date,
+                                        time=qual_data.time,
+                                        gist=qual_data.gist
+                                    )
+                                    db.add(booking)
+                                    
                                 db.add(lead)
                                 
                                 # Save assistant message
@@ -272,6 +283,17 @@ def send_simulator_message(req: SimulatorRequest, db: Session = Depends(get_sess
         
         if qual_data.gist and qual_data.gist.lower() != "null": 
             lead.handoff_note = qual_data.gist
+            
+        if qual_data.date and qual_data.date.lower() != "null" and qual_data.time and qual_data.time.lower() != "null":
+            booking = Booking(
+                lead_id=lead.id,
+                username=f"{lead.name or 'Unknown'}_{lead.id}",
+                booking_type="agent_call",
+                date=qual_data.date,
+                time=qual_data.time,
+                gist=qual_data.gist
+            )
+            db.add(booking)
             
         db.add(lead)
         
