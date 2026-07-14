@@ -917,6 +917,39 @@ def get_webhook_logs(db: Session = Depends(get_session)):
     logs = db.exec(select(WebhookLog).order_by(WebhookLog.created_at.desc()).limit(50)).all()
     return logs
 
+@app.get("/api/debug-db")
+def debug_db():
+    try:
+        from sqlmodel import create_engine
+        import sqlite3
+        conn = sqlite3.connect("asquared.db")
+        cursor = conn.cursor()
+        
+        # Get list of tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [t[0] for t in cursor.fetchall()]
+        
+        db_info = {}
+        for table in tables:
+            # Get columns
+            cursor.execute(f"PRAGMA table_info({table});")
+            columns = [c[1] for c in cursor.fetchall()]
+            
+            # Get count
+            cursor.execute(f"SELECT COUNT(*) FROM {table};")
+            count = cursor.fetchone()[0]
+            
+            db_info[table] = {
+                "columns": columns,
+                "count": count
+            }
+            
+        conn.close()
+        return {"status": "ok", "tables": db_info}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @app.get("/api/bookings")
 def get_bookings(db: Session = Depends(get_session)):
     bookings = db.exec(select(Booking).order_by(Booking.created_at.desc())).all()
