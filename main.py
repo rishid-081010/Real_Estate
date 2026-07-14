@@ -907,6 +907,29 @@ def get_dashboard_leads(db: Session = Depends(get_session)):
     leads = db.exec(select(Lead).order_by(Lead.created_at.desc())).all()
     return leads
 
+@app.delete("/api/leads/{lead_id}")
+def delete_lead(lead_id: int, db: Session = Depends(get_session)):
+    lead = db.get(Lead, lead_id)
+    if not lead:
+        return {"status": "error", "message": "Lead not found"}, 404
+    
+    # Delete related messages, bookings, call logs
+    messages = db.exec(select(Message).where(Message.lead_id == lead_id)).all()
+    for m in messages:
+        db.delete(m)
+        
+    bookings = db.exec(select(Booking).where(Booking.lead_id == lead_id)).all()
+    for b in bookings:
+        db.delete(b)
+        
+    call_logs = db.exec(select(CallLog).where(CallLog.lead_id == lead_id)).all()
+    for c in call_logs:
+        db.delete(c)
+        
+    db.delete(lead)
+    db.commit()
+    return {"status": "success", "message": f"Lead {lead_id} deleted"}
+
 @app.get("/api/meetings")
 def get_dashboard_meetings(db: Session = Depends(get_session)):
     meetings = db.exec(select(Lead).where(Lead.status.in_(["qualified", "ready_to_buy"]))).all()
