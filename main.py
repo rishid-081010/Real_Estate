@@ -569,7 +569,148 @@ async def retell_webhook(request: Request, db: Session = Depends(get_session)):
 
         return {"status": "success", "message": "Data saved"}
 
+    # CASE C: Retell payload with call data containing a transcript (playground or alternate format)
+    # e.g. { "call": { "call_id": "...", "call_status": "...", "transcript": "...", "transcript_object": [...] } }
+    call_data = body.get("call")
+    if call_data and (call_data.get("transcript") or call_data.get("transcript_object")):
+        call_id = call_data.get("call_id")
+        
+        # Check if we already saved this call
+        existing = db.exec(select(CallLog).where(CallLog.call_id == call_id)).first()
+        
+        transcript_obj = call_data.get("transcript_object") or []
+        transcript_raw = call_data.get("transcript") or ""
+        call_duration = call_data.get("duration_ms")
+        call_summary = call_data.get("call_analysis", {}).get("call_summary") if call_data.get("call_analysis") else None
+        disposition = call_data.get("disconnection_reason") or call_data.get("call_status") or "unknown"
+        phone = call_data.get("from_number") or call_data.get("to_number") or "N/A"
+        
+        # Build structured transcript
+        structured_transcript = []
+        if transcript_obj:
+            for turn in transcript_obj:
+                role = turn.get("role", "unknown")
+                content = turn.get("content", "")
+                structured_transcript.append({"role": role, "content": content})
+        elif transcript_raw:
+            lines = transcript_raw.strip().split("\n")
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("Agent:"):
+                    structured_transcript.append({"role": "agent", "content": line[6:].strip()})
+                elif line.startswith("User:"):
+                    structured_transcript.append({"role": "user", "content": line[5:].strip()})
+        
+        if structured_transcript:
+            # Try to find the lead
+            lead = None
+            if phone and phone != "N/A":
+                lead = db.exec(select(Lead).where(Lead.phone == phone)).first()
+            
+            if existing:
+                # Update existing record with latest transcript
+                existing.transcript = json.dumps(structured_transcript)
+                existing.disposition = disposition
+                if call_duration:
+                    existing.duration_seconds = int(call_duration / 1000)
+                if call_summary:
+                    existing.summary = call_summary
+                db.add(existing)
+            else:
+                call_log = CallLog(
+                    lead_id=lead.id if lead else None,
+                    call_id=call_id,
+                    phone=phone,
+                    lead_name=lead.name if lead else call_data.get("agent_name", "Unknown"),
+                    disposition=disposition,
+                    duration_seconds=int(call_duration / 1000) if call_duration else None,
+                    transcript=json.dumps(structured_transcript),
+                    summary=call_summary
+                )
+                db.add(call_log)
+            db.commit()
+            return {"status": "success", "event": "transcript_saved"}
+
     return {"status": "ignored", "reason": "Unknown payload structure"}
+
+# Backfill: Parse existing webhook logs and extract call transcripts into CallLog
+@app.post("/api/calls/backfill")
+def backfill_calls_from_webhooks(db: Session = Depends(get_session)):
+    logs = db.exec(select(WebhookLog).order_by(WebhookLog.created_at)).all()
+    backfilled = 0
+    
+    for log in logs:
+        try:
+            payload = json.loads(log.payload)
+        except:
+            continue
+        
+        # Check for call data with transcript
+        call_data = None
+        if payload.get("event") == "call_ended":
+            call_data = payload.get("call", {})
+        elif payload.get("call") and (payload["call"].get("transcript") or payload["call"].get("transcript_object")):
+            call_data = payload["call"]
+        
+        if not call_data:
+            continue
+        
+        call_id = call_data.get("call_id")
+        if not call_id:
+            continue
+            
+        # Skip if already backfilled
+        existing = db.exec(select(CallLog).where(CallLog.call_id == call_id)).first()
+        if existing:
+            continue
+        
+        transcript_obj = call_data.get("transcript_object") or []
+        transcript_raw = call_data.get("transcript") or ""
+        
+        structured_transcript = []
+        if transcript_obj:
+            for turn in transcript_obj:
+                structured_transcript.append({"role": turn.get("role", "unknown"), "content": turn.get("content", "")})
+        elif transcript_raw:
+            for line in transcript_raw.strip().split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("Agent:"):
+                    structured_transcript.append({"role": "agent", "content": line[6:].strip()})
+                elif line.startswith("User:"):
+                    structured_transcript.append({"role": "user", "content": line[5:].strip()})
+        
+        if not structured_transcript:
+            continue
+        
+        phone = call_data.get("from_number") or call_data.get("to_number") or "N/A"
+        disposition = call_data.get("disposition") or call_data.get("disconnection_reason") or call_data.get("call_status") or "unknown"
+        call_duration = call_data.get("duration_ms")
+        call_summary = call_data.get("call_analysis", {}).get("call_summary") if call_data.get("call_analysis") else None
+        
+        lead = None
+        if phone and phone != "N/A":
+            lead = db.exec(select(Lead).where(Lead.phone == phone)).first()
+        
+        call_log = CallLog(
+            lead_id=lead.id if lead else None,
+            call_id=call_id,
+            phone=phone,
+            lead_name=lead.name if lead else call_data.get("agent_name", "Unknown"),
+            disposition=disposition,
+            duration_seconds=int(call_duration / 1000) if call_duration else None,
+            transcript=json.dumps(structured_transcript),
+            summary=call_summary,
+            created_at=log.created_at
+        )
+        db.add(call_log)
+        backfilled += 1
+    
+    db.commit()
+    return {"status": "success", "backfilled": backfilled}
 
 @app.post("/api/leads/form")
 def create_lead_form(req: LeadFormRequest, db: Session = Depends(get_session)):
