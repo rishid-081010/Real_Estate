@@ -3,6 +3,7 @@ import csv
 import io
 import os
 import requests
+from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import FastAPI, Depends, UploadFile, File, Request
 from fastapi.staticfiles import StaticFiles
@@ -786,7 +787,6 @@ def get_dashboard_stats(db: Session = Depends(get_session)):
 
 @app.get("/api/analytics")
 def get_analytics(db: Session = Depends(get_session)):
-    from datetime import timedelta
     
     leads = db.exec(select(Lead)).all()
     bookings = db.exec(select(Booking)).all()
