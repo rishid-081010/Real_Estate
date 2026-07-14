@@ -85,7 +85,7 @@ def send_whatsapp_message(to_phone: str, text: str):
         # We create a new session just for this logging to avoid conflicts
         try:
             from sqlmodel import Session, create_engine
-            engine = create_engine("sqlite:///asquared.db")
+            engine = create_engine("sqlite:///database.sqlite")
             with Session(engine) as session:
                 session.add(WebhookLog(payload=json.dumps({"meta_whatsapp_response": response.json()})))
                 session.commit()
@@ -160,32 +160,32 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
                         text_body = msg.get("text", {}).get("body")
                         
                         if text_body and sender_phone:
-                            # 1. Find or create lead
-                            lead = db.exec(select(Lead).where(Lead.phone == sender_phone)).first()
-                            if not lead:
-                                lead = Lead(phone=sender_phone, name="WhatsApp User", channel="whatsapp", status="in_progress")
-                                db.add(lead)
-                            else:
-                                # Auto-shift to in_progress if they were previously unengaged
-                                if lead.status in ["no_answer", "fresh_leads", "assigned_leads"]:
-                                    lead.status = "in_progress"
-                                    db.add(lead)
-
-                            db.commit()
-                            db.refresh(lead)
-
-                            # 2. Save user message
-                            user_msg = Message(lead_id=lead.id, role="user", content=text_body, channel="whatsapp")
-                            db.add(user_msg)
-                            db.commit()
-
-                            # 3. Fetch chat history
-                            history = db.exec(select(Message).where(Message.lead_id == lead.id).order_by(Message.created_at)).all()
-                            chat_history = [{"role": m.role, "content": m.content} for m in history]
-
-                            # 4. Generate Gemini response
-                            from qualification import generate_whatsapp_response
                             try:
+                                # 1. Find or create lead
+                                lead = db.exec(select(Lead).where(Lead.phone == sender_phone)).first()
+                                if not lead:
+                                    lead = Lead(phone=sender_phone, name="WhatsApp User", channel="whatsapp", status="in_progress")
+                                    db.add(lead)
+                                else:
+                                    # Auto-shift to in_progress if they were previously unengaged
+                                    if lead.status in ["no_answer", "fresh_leads", "assigned_leads"]:
+                                        lead.status = "in_progress"
+                                        db.add(lead)
+
+                                db.commit()
+                                db.refresh(lead)
+
+                                # 2. Save user message
+                                user_msg = Message(lead_id=lead.id, role="user", content=text_body, channel="whatsapp")
+                                db.add(user_msg)
+                                db.commit()
+
+                                # 3. Fetch chat history
+                                history = db.exec(select(Message).where(Message.lead_id == lead.id).order_by(Message.created_at)).all()
+                                chat_history = [{"role": m.role, "content": m.content} for m in history]
+
+                                # 4. Generate Gemini response
+                                from qualification import generate_whatsapp_response
                                 qual_data = generate_whatsapp_response(chat_history)
                                 
                                 # Update CRM fields based on new "change:" logic
@@ -225,7 +225,7 @@ async def receive_whatsapp_message(request: Request, db: Session = Depends(get_s
                                 error_trace = traceback.format_exc()
                                 db.add(WebhookLog(payload=json.dumps({"error_in_gemini": str(e), "traceback": error_trace})))
                                 db.commit()
-                                print("[Gemini Error]", str(e))
+                                print("[Webhook Processing Error]", str(e))
                                 
         return {"status": "ok"}
     return {"status": "error", "message": "Invalid payload"}
@@ -922,7 +922,7 @@ def debug_db():
     try:
         from sqlmodel import create_engine
         import sqlite3
-        conn = sqlite3.connect("asquared.db")
+        conn = sqlite3.connect("database.sqlite")
         cursor = conn.cursor()
         
         # Get list of tables
