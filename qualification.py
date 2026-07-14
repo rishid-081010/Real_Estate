@@ -103,9 +103,14 @@ def generate_whatsapp_response(chat_history: List[dict]) -> WhatsAppQualificatio
     model = "gemini-2.5-flash"
     
     contents = []
+    last_role = None
     for msg in chat_history:
         role = "user" if msg["role"] == "user" else "model"
-        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+        if role == last_role:
+            contents[-1].parts[0].text += f"\n{msg['content']}"
+        else:
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+            last_role = role
 
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
