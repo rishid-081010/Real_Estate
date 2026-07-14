@@ -626,6 +626,41 @@ def get_bookings(db: Session = Depends(get_session)):
     bookings = db.exec(select(Booking).order_by(Booking.created_at.desc())).all()
     return bookings
 
+class ManualBookingRequest(BaseModel):
+    username: str
+    booking_type: str = "agent_call"
+    date: str
+    time: str
+    gist: Optional[str] = "Manual Booking"
+
+@app.post("/api/bookings")
+def create_manual_booking(req: ManualBookingRequest, db: Session = Depends(get_session)):
+    # Try to find the lead to link to
+    lead = get_lead_by_username(req.username, db)
+    
+    booking = Booking(
+        lead_id=lead.id if lead else None,
+        username=req.username,
+        booking_type=req.booking_type,
+        date=req.date,
+        time=req.time,
+        gist=req.gist,
+        status="confirmed"
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return {"status": "success", "booking_id": booking.id}
+
+@app.delete("/api/bookings/{booking_id}")
+def delete_booking(booking_id: int, db: Session = Depends(get_session)):
+    booking = db.exec(select(Booking).where(Booking.id == booking_id)).first()
+    if not booking:
+        return {"status": "error", "message": "Booking not found"}
+    db.delete(booking)
+    db.commit()
+    return {"status": "success"}
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
