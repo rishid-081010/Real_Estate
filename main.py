@@ -15,6 +15,18 @@ from qualification import generate_qualification_response, calculate_score
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Handle GCP Credentials on Render
+    gcp_creds = os.environ.get("GCP_CREDENTIALS_JSON")
+    if gcp_creds:
+        creds_path = "/tmp/gcp_creds.json"
+        # On Windows local, use a local temp path if /tmp doesn't exist
+        if os.name == 'nt':
+            creds_path = os.path.join(os.environ.get("TEMP", "."), "gcp_creds.json")
+        
+        with open(creds_path, "w") as f:
+            f.write(gcp_creds)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
+
     create_db_and_tables()
     yield
 
